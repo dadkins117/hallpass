@@ -612,6 +612,12 @@
     color: #042c53;
   }
 
+  /* PIN input — type=tel for numeric keypad, masked visually */
+  .pin-input {
+    -webkit-text-security: disc;
+    text-security: disc;
+  }
+
   /* PWA install banner */
   .install-banner {
     background: #e6f1fb;
@@ -984,7 +990,7 @@
   <div class="modal">
     <h2>Enter your student ID</h2>
     <p class="sub">Type the number printed on your school ID.</p>
-    <input type="text" id="manual-id" inputmode="numeric" pattern="[0-9]*" placeholder="Student ID" style="width: 100%; font-size: 22px; text-align: center; letter-spacing: 0.15em; padding: 18px;" autocomplete="off">
+    <input type="tel" id="manual-id" inputmode="numeric" pattern="[0-9]*" placeholder="Student ID" style="width: 100%; font-size: 22px; text-align: center; letter-spacing: 0.15em; padding: 18px;" autocomplete="off">
     <div style="display: flex; gap: 8px; margin-top: 16px;">
       <button id="manual-cancel" style="flex: 1;">Cancel</button>
       <button class="primary" id="manual-submit" style="flex: 1;">Continue</button>
@@ -1087,11 +1093,11 @@
     <p class="sub" id="pin-setup-sub">Pick a 4-digit PIN. You'll enter it before deleting any pass record. Stored only on this device (and in your backup file).</p>
     <div style="margin-bottom: 12px;">
       <label style="display: block; font-size: 13px; color: var(--ink-2); margin-bottom: 4px;">PIN (4 digits)</label>
-      <input type="password" id="pin-setup-pin" inputmode="numeric" maxlength="4" pattern="[0-9]*" autocomplete="off" style="width: 100%; font-size: 18px; text-align: center; letter-spacing: 0.3em; padding: 14px;">
+      <input type="tel" class="pin-input" id="pin-setup-pin" inputmode="numeric" maxlength="4" pattern="[0-9]*" autocomplete="off" style="width: 100%; font-size: 18px; text-align: center; letter-spacing: 0.3em; padding: 14px;">
     </div>
     <div style="margin-bottom: 16px;">
       <label style="display: block; font-size: 13px; color: var(--ink-2); margin-bottom: 4px;">Confirm PIN</label>
-      <input type="password" id="pin-setup-confirm" inputmode="numeric" maxlength="4" pattern="[0-9]*" autocomplete="off" style="width: 100%; font-size: 18px; text-align: center; letter-spacing: 0.3em; padding: 14px;">
+      <input type="tel" class="pin-input" id="pin-setup-confirm" inputmode="numeric" maxlength="4" pattern="[0-9]*" autocomplete="off" style="width: 100%; font-size: 18px; text-align: center; letter-spacing: 0.3em; padding: 14px;">
     </div>
     <div style="display: flex; gap: 8px;">
       <button id="pin-setup-cancel" style="flex: 1;">Cancel</button>
@@ -1104,7 +1110,7 @@
   <div class="modal">
     <h2>Enter teacher PIN</h2>
     <p class="sub" id="pin-enter-sub">Required to delete this pass record.</p>
-    <input type="password" id="pin-enter-pin" inputmode="numeric" maxlength="4" pattern="[0-9]*" autocomplete="off" style="width: 100%; font-size: 22px; text-align: center; letter-spacing: 0.3em; padding: 14px; margin-bottom: 16px;">
+    <input type="tel" class="pin-input" id="pin-enter-pin" inputmode="numeric" maxlength="4" pattern="[0-9]*" autocomplete="off" style="width: 100%; font-size: 22px; text-align: center; letter-spacing: 0.3em; padding: 14px; margin-bottom: 16px;">
     <div id="pin-enter-error" style="color: var(--over); font-size: 13px; margin-bottom: 12px; display: none;"></div>
     <div style="display: flex; gap: 8px;">
       <button id="pin-enter-cancel" style="flex: 1;">Cancel</button>
