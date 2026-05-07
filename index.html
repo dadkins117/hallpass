@@ -1125,6 +1125,24 @@
   </div>
 </div>
 
+<div class="overlay" id="overlay-edit-return">
+  <div class="modal">
+    <h2>Edit return time</h2>
+    <p class="sub">Type the time the student actually returned. Accepts formats like "1:23 PM", "1:23pm", or "13:23".</p>
+    <div id="edit-return-info" style="background: var(--surface-2); border-radius: var(--radius); padding: 12px 14px; font-size: 13px; margin-bottom: 16px; line-height: 1.6;"></div>
+    <div style="margin-bottom: 12px;">
+      <label style="display: block; font-size: 13px; color: var(--ink-2); margin-bottom: 4px;">Return time</label>
+      <input type="text" id="edit-return-input" placeholder="e.g. 1:23 PM" style="width: 100%; font-size: 18px; padding: 14px;" autocomplete="off">
+      <div id="edit-return-preview" style="font-size: 12px; color: var(--ink-3); margin-top: 6px; min-height: 16px;"></div>
+    </div>
+    <div id="edit-return-error" style="color: var(--over); font-size: 13px; margin-bottom: 12px; display: none;"></div>
+    <div style="display: flex; gap: 8px;">
+      <button id="edit-return-cancel" style="flex: 1;">Cancel</button>
+      <button class="primary" id="edit-return-save" style="flex: 1;">Save</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ============ KELLER ISD CALENDAR ============
 const KELLER_QUARTERS = [
@@ -1726,6 +1744,7 @@ function renderDash() {
           </div>
           <div class="timer tabular ${cls === 'ok' ? '' : cls}" data-live-pass="${p.id}">${fmtDuration(sec)}</div>
           <button class="ghost" data-mark-return="${p.id}">Mark returned</button>
+          <button class="ghost icon-btn" data-edit-return="${p.id}" title="Edit return time" style="font-size: 14px; padding: 4px 8px; line-height: 1; color: var(--ink-3);">✎</button>
           <button class="ghost icon-btn" data-delete-pass="${p.id}" title="Delete pass" style="font-size: 16px; padding: 4px 10px; line-height: 1; color: var(--ink-3);">×</button>
         </div>
       `;
@@ -1772,6 +1791,12 @@ function renderDash() {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       requestDeletePass(btn.dataset.deletePass, () => renderDash());
+    });
+  });
+  document.querySelectorAll('[data-edit-return]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      requestEditReturn(btn.dataset.editReturn, () => renderDash());
     });
   });
   document.querySelectorAll('[data-student-detail]').forEach(row => {
@@ -1938,7 +1963,7 @@ function openStudentDetail(studentId) {
   if (allPasses.length === 0) {
     html += '<div style="text-align: center; color: var(--ink-3); padding: 24px;">No passes yet.</div>';
   } else {
-    html += '<table class="log"><thead><tr><th>Date</th><th>Destination</th><th class="right">Length</th><th class="right">Status</th><th class="right" style="width: 36px;"></th></tr></thead><tbody>';
+    html += '<table class="log"><thead><tr><th>Date</th><th>Destination</th><th class="right">Length</th><th class="right">Status</th><th class="right" style="width: 72px;"></th></tr></thead><tbody>';
     allPasses.slice(0, 30).forEach(p => {
       const isOut = !p.signInAt;
       const sec = passDurationSec(p);
@@ -1956,7 +1981,10 @@ function openStudentDetail(studentId) {
           <td style="color: var(--ink-2);">${escapeHtml(p.destination)}</td>
           <td class="right tabular">${fmtDuration(sec)}</td>
           <td class="right"><span class="pill ${pillCls}">${pillText}</span></td>
-          <td class="right"><button class="ghost icon-btn" data-delete-pass="${escapeHtml(p.id)}" title="Delete pass" style="font-size: 16px; padding: 2px 8px; line-height: 1;">×</button></td>
+          <td class="right" style="white-space: nowrap;">
+            <button class="ghost icon-btn" data-edit-return="${escapeHtml(p.id)}" title="Edit return time" style="font-size: 13px; padding: 2px 6px; line-height: 1; color: var(--ink-3);">✎</button>
+            <button class="ghost icon-btn" data-delete-pass="${escapeHtml(p.id)}" title="Delete pass" style="font-size: 16px; padding: 2px 6px; line-height: 1; color: var(--ink-3);">×</button>
+          </td>
         </tr>
       `;
     });
@@ -1993,6 +2021,14 @@ function openStudentDetail(studentId) {
       e.stopPropagation();
       const passId = btn.dataset.deletePass;
       requestDeletePass(passId, () => openStudentDetail(studentId));
+    });
+  });
+  // Wire up edit-return buttons
+  document.querySelectorAll('[data-edit-return]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const passId = btn.dataset.editReturn;
+      requestEditReturn(passId, () => openStudentDetail(studentId));
     });
   });
 }
@@ -3133,6 +3169,147 @@ document.getElementById('delete-pass-confirm').addEventListener('click', async (
   toast(`Pass deleted${shouldRefund ? ' · bathroom count refunded' : ''}`);
   pendingDeletePass = null;
   pendingDeleteRefresh = null;
+  renderKiosk();
+  if (refreshFn) refreshFn();
+});
+
+// ============ EDIT RETURN TIME ============
+
+// Parse a free-form time string like "1:23 PM", "13:23", "1:23pm" into a Date
+// for today (or, if the resulting time would be in the future, yesterday).
+// Returns null if unparseable.
+function parseTimeInput(input, referenceDate) {
+  if (!input) return null;
+  const ref = referenceDate ? new Date(referenceDate) : new Date();
+  const trimmed = String(input).trim().toLowerCase().replace(/\s+/g, '');
+  // Match optional am/pm at end
+  const m = trimmed.match(/^(\d{1,2}):(\d{2})(am|pm)?$/);
+  if (!m) return null;
+  let hour = parseInt(m[1]);
+  const minute = parseInt(m[2]);
+  const period = m[3];
+  if (isNaN(hour) || isNaN(minute) || minute < 0 || minute > 59) return null;
+  if (period === 'am') {
+    if (hour === 12) hour = 0;
+    else if (hour < 1 || hour > 12) return null;
+  } else if (period === 'pm') {
+    if (hour === 12) {/* keep */}
+    else if (hour >= 1 && hour <= 11) hour += 12;
+    else return null;
+  } else {
+    // 24-hour
+    if (hour < 0 || hour > 23) return null;
+  }
+  // Build result on the same day as ref
+  const result = new Date(ref.getFullYear(), ref.getMonth(), ref.getDate(), hour, minute, 0, 0);
+  return result;
+}
+
+let pendingEditPass = null;
+let pendingEditRefresh = null;
+
+function requestEditReturn(passId, refreshFn) {
+  const pass = state.passes.find(p => p.id === passId);
+  if (!pass) return;
+  pendingEditPass = pass;
+  pendingEditRefresh = refreshFn;
+  const period = getPeriod(pass.periodId);
+  const isOut = !pass.signInAt;
+  const signOutDate = new Date(pass.signOutAt);
+  // Default the input to current return time, or "now" if still out
+  const currentReturn = pass.signInAt ? new Date(pass.signInAt) : new Date();
+  const defaultText = currentReturn.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true });
+  document.getElementById('edit-return-info').innerHTML = `
+    <div><strong>${escapeHtml(pass.studentName)}</strong></div>
+    <div>${escapeHtml(pass.destination)}${period ? ' · ' + escapeHtml(period.name) : ''}</div>
+    <div>Signed out at ${fmtTime(pass.signOutAt)} ${isOut ? '· still out' : '· returned at ' + fmtTime(pass.signInAt)}</div>
+  `;
+  const input = document.getElementById('edit-return-input');
+  input.value = defaultText;
+  document.getElementById('edit-return-preview').textContent = '';
+  document.getElementById('edit-return-error').style.display = 'none';
+  document.getElementById('overlay-edit-return').classList.add('active');
+  setTimeout(() => { input.focus(); input.select(); }, 50);
+  updateEditReturnPreview();
+}
+
+function updateEditReturnPreview() {
+  if (!pendingEditPass) return;
+  const input = document.getElementById('edit-return-input').value;
+  const previewEl = document.getElementById('edit-return-preview');
+  const errorEl = document.getElementById('edit-return-error');
+  errorEl.style.display = 'none';
+  if (!input.trim()) { previewEl.textContent = ''; return; }
+  const signOutDate = new Date(pendingEditPass.signOutAt);
+  const parsed = parseTimeInput(input, signOutDate);
+  if (!parsed) {
+    previewEl.textContent = '';
+    return;
+  }
+  // If parsed time is before sign-out, that's invalid
+  if (parsed.getTime() < signOutDate.getTime()) {
+    previewEl.innerHTML = `<span style="color: var(--over);">That's before they signed out (${fmtTime(pendingEditPass.signOutAt)})</span>`;
+    return;
+  }
+  // Compute resulting duration
+  const seconds = (parsed.getTime() - signOutDate.getTime()) / 1000;
+  previewEl.innerHTML = `<span style="color: var(--ok);">Duration would be ${fmtDuration(seconds)}</span>`;
+}
+
+document.getElementById('edit-return-input').addEventListener('input', updateEditReturnPreview);
+document.getElementById('edit-return-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('edit-return-save').click();
+});
+
+document.getElementById('edit-return-cancel').addEventListener('click', () => {
+  document.getElementById('overlay-edit-return').classList.remove('active');
+  pendingEditPass = null;
+  pendingEditRefresh = null;
+});
+
+document.getElementById('edit-return-save').addEventListener('click', async () => {
+  if (!pendingEditPass) return;
+  const input = document.getElementById('edit-return-input').value.trim();
+  const errorEl = document.getElementById('edit-return-error');
+  errorEl.style.display = 'none';
+
+  if (!input) { errorEl.textContent = 'Enter a time'; errorEl.style.display = ''; return; }
+  const signOutDate = new Date(pendingEditPass.signOutAt);
+  const parsed = parseTimeInput(input, signOutDate);
+  if (!parsed) {
+    errorEl.textContent = 'Couldn\'t read that time. Try formats like "1:23 PM" or "13:23".';
+    errorEl.style.display = '';
+    return;
+  }
+  if (parsed.getTime() < signOutDate.getTime()) {
+    errorEl.textContent = `Return time must be after sign-out (${fmtTime(pendingEditPass.signOutAt)}).`;
+    errorEl.style.display = '';
+    return;
+  }
+  if (parsed.getTime() > Date.now() + 60 * 1000) {
+    errorEl.textContent = "Return time can't be in the future.";
+    errorEl.style.display = '';
+    return;
+  }
+
+  // Hide modal before PIN prompt to avoid stacked overlays
+  document.getElementById('overlay-edit-return').classList.remove('active');
+  const ok = await requestPin('Required to edit return time.');
+  if (!ok) {
+    pendingEditPass = null;
+    pendingEditRefresh = null;
+    return;
+  }
+
+  // Apply edit
+  const pass = pendingEditPass;
+  const refreshFn = pendingEditRefresh;
+  pass.signInAt = parsed.toISOString();
+  pass.manualReturn = true;
+  saveState();
+  toast(`Return time updated`);
+  pendingEditPass = null;
+  pendingEditRefresh = null;
   renderKiosk();
   if (refreshFn) refreshFn();
 });
