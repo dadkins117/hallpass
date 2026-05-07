@@ -1,7 +1,7 @@
 // Hall Pass service worker
 // Caches the app shell so the app works offline after first load.
 
-const CACHE_VERSION = 'hallpass-v7-2026-05-07';
+const CACHE_VERSION = 'hallpass-v9-2026-05-07';
 const APP_SHELL = [
   './',
   './index.html',
@@ -9,7 +9,6 @@ const APP_SHELL = [
   './icon-192.png',
   './icon-512.png',
   // External libs we depend on; cached on first load
-  'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js',
   'https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js',
   'https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap'
 ];
