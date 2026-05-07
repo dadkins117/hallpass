@@ -1,0 +1,3058 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Hall Pass — Classroom Tool</title>
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#2c2c2a">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Hall Pass">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="icon" href="favicon-48.png" type="image/png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<style>
+  :root {
+    --bg: #faf8f3;
+    --surface: #ffffff;
+    --surface-2: #f1ede4;
+    --ink: #1a1a1a;
+    --ink-2: #555;
+    --ink-3: #888780;
+    --line: #e5e0d3;
+    --line-strong: #d0cabc;
+    --accent: #2c2c2a;
+    --warn: #b8862a;
+    --over: #a32d2d;
+    --referral: #6b1a1a;
+    --ok: #0f6e56;
+    --kiosk-bg: #2c2c2a;
+    --kiosk-ink: #f1efe8;
+    --kiosk-ink-2: #b4b2a9;
+    --kiosk-ink-3: #888780;
+    --kiosk-warn: #fac775;
+    --kiosk-over: #f09595;
+    --kiosk-referral: #d54545;
+    --kiosk-ok: #9fe1cb;
+    --radius: 8px;
+    --radius-lg: 12px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body {
+    font-family: 'Inter', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--ink);
+    height: 100%;
+    -webkit-font-smoothing: antialiased;
+  }
+  button {
+    font-family: inherit;
+    font-size: 14px;
+    background: var(--surface);
+    color: var(--ink);
+    border: 0.5px solid var(--line-strong);
+    border-radius: var(--radius);
+    padding: 10px 16px;
+    cursor: pointer;
+    transition: all 0.12s ease;
+  }
+  button:hover { background: var(--surface-2); border-color: var(--ink-3); }
+  button:active { transform: translateY(1px); }
+  button.primary { background: var(--accent); color: white; border-color: var(--accent); }
+  button.primary:hover { background: #444; border-color: #444; }
+  button.ghost { background: transparent; border-color: transparent; color: var(--ink-2); }
+  button.ghost:hover { background: var(--surface-2); }
+  input, select {
+    font-family: inherit;
+    font-size: 14px;
+    padding: 10px 12px;
+    border: 0.5px solid var(--line-strong);
+    border-radius: var(--radius);
+    background: var(--surface);
+    color: var(--ink);
+    outline: none;
+  }
+  input:focus, select:focus { border-color: var(--ink-2); }
+  .display-font { font-family: 'Fraunces', Georgia, serif; }
+  .tabular { font-variant-numeric: tabular-nums; }
+
+  #app { min-height: 100vh; display: flex; flex-direction: column; }
+  .topbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 24px;
+    border-bottom: 0.5px solid var(--line);
+    background: var(--surface);
+  }
+  .brand {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+  }
+  .brand .name {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+  .brand .sub {
+    font-size: 12px;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+  }
+  .tabs { display: flex; gap: 2px; }
+  .tab {
+    background: transparent;
+    border: none;
+    border-radius: 0;
+    padding: 8px 14px;
+    color: var(--ink-2);
+    font-size: 13px;
+    font-weight: 500;
+    border-bottom: 2px solid transparent;
+  }
+  .tab:hover { background: transparent; color: var(--ink); }
+  .tab.active { color: var(--ink); border-bottom-color: var(--ink); }
+
+  /* Period selector — visible at top of kiosk and dashboard */
+  .period-selector {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    background: var(--surface-2);
+    border-radius: 999px;
+    padding: 3px;
+  }
+  .period-pill {
+    padding: 6px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    border: none;
+    background: transparent;
+    color: var(--ink-2);
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .period-pill:hover { color: var(--ink); }
+  .period-pill.active {
+    background: var(--surface);
+    color: var(--ink);
+    box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  }
+
+  main { flex: 1; padding: 24px; max-width: 1100px; width: 100%; margin: 0 auto; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  /* Kiosk */
+  .kiosk-frame {
+    background: var(--kiosk-bg);
+    color: var(--kiosk-ink);
+    border-radius: var(--radius-lg);
+    min-height: 580px;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    position: relative;
+    overflow: hidden;
+  }
+  .kiosk-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 32px;
+  }
+  .kiosk-period {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--kiosk-ink-2);
+  }
+  .kiosk-clock {
+    font-size: 14px;
+    color: var(--kiosk-ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+  .kiosk-screen { flex: 1; display: flex; flex-direction: column; }
+  .out-list { flex: 1; }
+  .out-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 22px 0;
+    border-bottom: 0.5px solid #5f5e5a;
+  }
+  .out-row:last-child { border-bottom: none; }
+  .out-name {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 32px;
+    font-weight: 500;
+    margin-bottom: 4px;
+    letter-spacing: -0.01em;
+  }
+  .out-dest { font-size: 15px; color: var(--kiosk-ink-2); }
+  .out-time {
+    font-size: 38px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+  .out-time.warn { color: var(--kiosk-warn); }
+  .out-time.over { color: var(--kiosk-over); }
+  .out-time.referral { color: var(--kiosk-referral); }
+  .out-time.ok { color: var(--kiosk-ok); }
+  .out-time-label { font-size: 12px; color: var(--kiosk-ink-3); text-align: right; }
+  .empty-state {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    color: var(--kiosk-ink-3);
+  }
+  .empty-state .big {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 36px;
+    color: var(--kiosk-ink-2);
+    margin-bottom: 8px;
+    font-weight: 400;
+  }
+  .scan-cta {
+    display: flex;
+    gap: 12px;
+    margin-top: 24px;
+  }
+  .scan-cta button {
+    flex: 1;
+    background: var(--kiosk-ink);
+    color: var(--kiosk-bg);
+    border: none;
+    padding: 18px;
+    font-size: 16px;
+    font-weight: 500;
+    border-radius: var(--radius);
+  }
+  .scan-cta button:hover { background: white; }
+  .scan-cta button.secondary {
+    background: transparent;
+    color: var(--kiosk-ink);
+    border: 0.5px solid var(--kiosk-ink-3);
+  }
+  .scan-cta button.secondary:hover { background: rgba(255,255,255,0.06); }
+
+  /* Modals */
+  .overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(20, 20, 18, 0.85);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    padding: 24px;
+  }
+  .overlay.active { display: flex; }
+  .modal {
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    max-width: 600px;
+    width: 100%;
+    padding: 32px;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+  .modal h2 {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 24px;
+    font-weight: 500;
+    margin-bottom: 8px;
+    letter-spacing: -0.01em;
+  }
+  .modal .sub { color: var(--ink-2); font-size: 14px; margin-bottom: 24px; }
+
+  #qr-reader { width: 100%; border-radius: var(--radius); overflow: hidden; }
+  #qr-reader video { width: 100% !important; height: auto !important; }
+  .camera-timer {
+    text-align: center;
+    margin-top: 12px;
+    font-size: 13px;
+    color: var(--ink-2);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .student-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding-bottom: 16px;
+    border-bottom: 0.5px solid var(--line);
+    margin-bottom: 20px;
+  }
+  .avatar {
+    width: 56px;
+    height: 56px;
+    border-radius: 50%;
+    background: #d4d0e8;
+    color: #26215c;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 18px;
+    flex-shrink: 0;
+  }
+  .student-name {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 22px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+  .student-id { font-size: 13px; color: var(--ink-2); }
+  .pass-counter { text-align: right; }
+  .pass-counter .num {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 24px;
+    font-weight: 500;
+  }
+  .pass-counter .label { font-size: 11px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; }
+  .dest-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-bottom: 16px;
+  }
+  .dest-btn {
+    padding: 18px;
+    text-align: left;
+    min-height: 76px;
+    border-radius: var(--radius);
+    background: var(--surface);
+    border: 0.5px solid var(--line-strong);
+    cursor: pointer;
+    transition: all 0.12s ease;
+  }
+  .dest-btn:hover { background: var(--surface-2); border-color: var(--ink-3); }
+  .dest-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+  .dest-btn .name { font-size: 15px; font-weight: 500; margin-bottom: 4px; }
+  .dest-btn .meta { font-size: 12px; color: var(--ink-2); }
+
+  .return-card {
+    background: var(--surface-2);
+    border-radius: var(--radius);
+    padding: 24px;
+    text-align: center;
+    margin: 20px 0;
+  }
+  .return-card .duration {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 56px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    line-height: 1;
+    margin-bottom: 8px;
+  }
+  .return-card .label { font-size: 13px; color: var(--ink-2); }
+  .return-card.warn { background: #faedda; }
+  .return-card.over { background: #f8dada; }
+  .return-card.over .duration { color: var(--over); }
+  .return-card.referral { background: #fbe5e5; }
+  .return-card.referral .duration { color: var(--referral); }
+
+  /* Dashboard */
+  .dash-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-end;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+    gap: 16px;
+  }
+  .dash-title {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 28px;
+    font-weight: 500;
+    letter-spacing: -0.01em;
+  }
+  .dash-sub {
+    font-size: 12px;
+    color: var(--ink-3);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    margin-bottom: 4px;
+  }
+  .dash-controls { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+
+  .quarter-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    border-radius: 20px;
+    background: var(--surface-2);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--ink-2);
+  }
+  .quarter-chip .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--ok);
+  }
+
+  .out-now {
+    background: var(--surface);
+    border: 0.5px solid var(--line);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    margin-bottom: 24px;
+  }
+  .out-now-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 18px;
+    border-bottom: 0.5px solid var(--line);
+  }
+  .out-now-row:last-child { border-bottom: none; }
+  .out-now-row .info { flex: 1; min-width: 0; }
+  .out-now-row .name { font-size: 15px; font-weight: 500; }
+  .out-now-row .meta { font-size: 12px; color: var(--ink-2); }
+  .out-now-row .timer {
+    font-size: 18px;
+    font-weight: 500;
+    font-variant-numeric: tabular-nums;
+    margin-right: 12px;
+  }
+  .out-now-row .timer.warn { color: var(--warn); }
+  .out-now-row .timer.over { color: var(--over); }
+  .out-now-row .timer.referral { color: var(--referral); font-weight: 600; }
+  .empty-row {
+    padding: 24px;
+    text-align: center;
+    color: var(--ink-3);
+    font-size: 14px;
+  }
+
+  .referral-banner {
+    background: #fbe5e5;
+    border: 0.5px solid #e8a8a8;
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    margin-bottom: 16px;
+    font-size: 14px;
+    color: var(--referral);
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .referral-banner .icon { font-size: 18px; }
+  .referral-banner strong { font-weight: 600; }
+
+  .log-section { margin-top: 24px; }
+  .section-title {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--ink-2);
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .section-title .count { font-weight: 400; color: var(--ink-3); }
+
+  table.log {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+    background: var(--surface);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+  }
+  table.log th {
+    text-align: left;
+    padding: 10px 14px;
+    font-weight: 500;
+    color: var(--ink-2);
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    border-bottom: 0.5px solid var(--line);
+    background: var(--surface);
+  }
+  table.log td {
+    padding: 10px 14px;
+    border-bottom: 0.5px solid var(--line);
+  }
+  table.log tr:last-child td { border-bottom: none; }
+  table.log tr.clickable { cursor: pointer; }
+  table.log tr.clickable:hover { background: var(--surface-2); }
+  table.log td.right { text-align: right; }
+  table.log .pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+  }
+  .pill.out { background: #e6f1fb; color: #042c53; }
+  .pill.back { background: var(--surface-2); color: var(--ink-2); }
+  .pill.warn { background: #faedda; color: #633806; }
+  .pill.over { background: #fbe5e5; color: var(--over); }
+  .pill.referral { background: var(--referral); color: white; }
+
+  .search-bar {
+    background: var(--surface);
+    border: 0.5px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .search-input-row {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .search-input-row input { flex: 1; font-size: 15px; }
+
+  .offender-card {
+    background: #faedda;
+    border: 0.5px solid #e8c995;
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    margin-bottom: 8px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+    transition: all 0.12s ease;
+  }
+  .offender-card:hover { background: #f5e3c5; }
+  .offender-card .name { font-weight: 500; font-size: 14px; }
+  .offender-card .stats { font-size: 12px; color: #633806; margin-top: 2px; }
+  .offender-card .arrow { color: var(--ink-3); font-size: 14px; }
+
+  .setup-grid { display: grid; gap: 24px; }
+  .setup-card {
+    background: var(--surface);
+    border: 0.5px solid var(--line);
+    border-radius: var(--radius-lg);
+    padding: 24px;
+  }
+  .setup-card h3 {
+    font-family: 'Fraunces', Georgia, serif;
+    font-size: 18px;
+    font-weight: 500;
+    margin-bottom: 6px;
+  }
+  .setup-card .help {
+    font-size: 13px;
+    color: var(--ink-2);
+    margin-bottom: 16px;
+    line-height: 1.5;
+  }
+  .field-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 0.5px solid var(--line);
+    font-size: 14px;
+    gap: 12px;
+  }
+  .field-row:last-child { border-bottom: none; }
+  .field-row label { color: var(--ink-2); }
+  .field-row input { width: 80px; text-align: center; }
+  .field-row input[type="text"] { width: 200px; text-align: left; }
+  .threshold-help {
+    font-size: 12px;
+    color: var(--ink-3);
+    margin-top: -4px;
+    margin-bottom: 4px;
+    padding: 0 4px;
+  }
+  .file-drop {
+    border: 1.5px dashed var(--line-strong);
+    border-radius: var(--radius);
+    padding: 24px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.12s ease;
+  }
+  .file-drop:hover { background: var(--surface-2); border-color: var(--ink-3); }
+  .file-drop input { display: none; }
+  .file-drop .drop-text { font-size: 14px; font-weight: 500; margin-bottom: 4px; }
+  .file-drop .drop-help { font-size: 12px; color: var(--ink-3); }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--accent);
+    color: white;
+    padding: 12px 20px;
+    border-radius: var(--radius);
+    font-size: 13px;
+    box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+    z-index: 200;
+    animation: slideUp 0.2s ease;
+  }
+  @keyframes slideUp {
+    from { transform: translate(-50%, 20px); opacity: 0; }
+    to { transform: translate(-50%, 0); opacity: 1; }
+  }
+
+  .accommodation-pill {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 500;
+    background: #e6f1fb;
+    color: #042c53;
+  }
+
+  /* PWA install banner */
+  .install-banner {
+    background: #e6f1fb;
+    border-bottom: 0.5px solid #85b7eb;
+    padding: 10px 24px;
+    display: none;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    color: #042c53;
+  }
+  .install-banner.show { display: flex; }
+  .install-banner .text { flex: 1; }
+  .install-banner button {
+    background: var(--surface);
+    color: #042c53;
+    border-color: #85b7eb;
+    font-size: 12px;
+    padding: 6px 12px;
+  }
+  .install-banner button.dismiss { background: transparent; border: none; color: #042c53; opacity: 0.7; }
+
+  /* Backup-stale banner */
+  .backup-banner {
+    background: #faedda;
+    border-bottom: 0.5px solid #e8c995;
+    padding: 10px 24px;
+    display: none;
+    align-items: center;
+    gap: 12px;
+    font-size: 13px;
+    color: #633806;
+  }
+  .backup-banner.show { display: flex; }
+  .backup-banner .text { flex: 1; }
+  .backup-banner button {
+    background: var(--surface);
+    color: #633806;
+    border-color: #e8c995;
+    font-size: 12px;
+    padding: 6px 12px;
+  }
+  .backup-banner button.dismiss { background: transparent; border: none; color: #633806; opacity: 0.7; }
+
+  /* Install instructions modal */
+  .install-step {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 10px 0;
+    border-bottom: 0.5px solid var(--line);
+    font-size: 14px;
+  }
+  .install-step:last-child { border-bottom: none; }
+  .install-step .num {
+    flex-shrink: 0;
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: var(--surface-2);
+    color: var(--ink);
+    font-size: 12px;
+    font-weight: 600;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Period management in setup */
+  .period-list {
+    background: var(--surface);
+    border: 0.5px solid var(--line);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+  .period-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 14px;
+    border-bottom: 0.5px solid var(--line);
+    font-size: 14px;
+    gap: 12px;
+  }
+  .period-row:last-child { border-bottom: none; }
+  .period-row .info { flex: 1; }
+  .period-row .name { font-weight: 500; }
+  .period-row .meta { font-size: 12px; color: var(--ink-2); margin-top: 2px; }
+
+  /* Import preview */
+  .import-preview {
+    background: var(--surface-2);
+    border-radius: var(--radius);
+    padding: 14px;
+    margin-top: 14px;
+    font-size: 13px;
+  }
+  .import-preview-summary {
+    font-weight: 500;
+    margin-bottom: 8px;
+  }
+  .import-preview-list {
+    color: var(--ink-2);
+    font-size: 12px;
+    line-height: 1.6;
+  }
+
+  /* Barcode mapping prompt */
+  .barcode-mapping-info {
+    background: #e6f1fb;
+    border: 0.5px solid #85b7eb;
+    border-radius: var(--radius);
+    padding: 12px 14px;
+    font-size: 13px;
+    color: #042c53;
+    margin-bottom: 16px;
+    line-height: 1.5;
+  }
+
+  @media (max-width: 640px) {
+    main { padding: 16px; }
+    .topbar { padding: 12px 16px; flex-direction: column; gap: 12px; align-items: stretch; }
+    .tabs { overflow-x: auto; }
+    .kiosk-frame { padding: 24px; min-height: 480px; }
+    .out-name { font-size: 26px; }
+    .out-time { font-size: 30px; }
+    .dest-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div class="install-banner" id="install-banner">
+    <div class="text" id="install-banner-text">Install this app for offline use and faster access.</div>
+    <button id="install-prompt-btn">Install</button>
+    <button class="dismiss" id="install-dismiss-btn" title="Dismiss">×</button>
+  </div>
+  <div class="backup-banner" id="backup-banner">
+    <div class="text" id="backup-banner-text">Last backup is over 7 days old.</div>
+    <button id="backup-now-btn">Back up now</button>
+    <button class="dismiss" id="backup-dismiss-btn" title="Remind me tomorrow">×</button>
+  </div>
+  <div class="topbar">
+    <div class="brand">
+      <div class="name display-font">Hall Pass</div>
+      <div class="sub" id="brand-sub">Setup needed</div>
+    </div>
+    <div class="tabs">
+      <button class="tab active" data-tab="kiosk">Kiosk</button>
+      <button class="tab" data-tab="dash">Teacher view</button>
+      <button class="tab" data-tab="search">Search</button>
+      <button class="tab" data-tab="setup">Setup</button>
+    </div>
+  </div>
+
+  <main>
+    <!-- KIOSK -->
+    <div class="panel active" id="panel-kiosk">
+      <div class="kiosk-frame">
+        <div class="kiosk-header">
+          <div class="kiosk-period" id="kiosk-period">Set up your class first</div>
+          <div class="kiosk-clock tabular" id="kiosk-clock">—</div>
+        </div>
+        <div class="kiosk-screen" id="kiosk-screen"></div>
+      </div>
+    </div>
+
+    <!-- DASHBOARD -->
+    <div class="panel" id="panel-dash">
+      <div class="dash-header">
+        <div>
+          <div class="dash-sub" id="dash-sub">No class loaded</div>
+          <div class="dash-title display-font" id="dash-title">Teacher view</div>
+        </div>
+        <div class="dash-controls">
+          <span class="quarter-chip" id="quarter-chip"><span class="dot"></span><span id="quarter-label">—</span></span>
+          <button class="ghost" id="export-btn">Export CSV</button>
+        </div>
+      </div>
+      <div id="dash-content">
+        <div class="empty-row">Set up your class to see what's happening here.</div>
+      </div>
+    </div>
+
+    <!-- SEARCH -->
+    <div class="panel" id="panel-search">
+      <div class="dash-header">
+        <div>
+          <div class="dash-sub">Lookup</div>
+          <div class="dash-title display-font">Search students</div>
+        </div>
+      </div>
+      <div class="search-bar">
+        <div class="search-input-row">
+          <input type="text" id="search-input" placeholder="Search by name or student ID across all your classes" autocomplete="off">
+        </div>
+        <div style="font-size: 12px; color: var(--ink-3);">
+          Searches all your classes. Click any result for full pass history.
+        </div>
+      </div>
+      <div id="search-results"></div>
+    </div>
+
+    <!-- SETUP -->
+    <div class="panel" id="panel-setup">
+      <div class="setup-grid">
+        <div class="setup-card">
+          <h3>Your info</h3>
+          <p class="help">Your name appears on the kiosk header.</p>
+          <div class="field-row">
+            <label>Teacher name</label>
+            <input type="text" id="teacher-name" placeholder="e.g. Ms. Patel">
+          </div>
+          <div style="margin-top: 12px;">
+            <button class="primary" id="save-teacher">Save</button>
+          </div>
+        </div>
+
+        <div class="setup-card">
+          <h3>Roster import</h3>
+          <p class="help">Upload an Aeries export (CSV or XLSX). The system reads <strong>Period, Student ID, and Name</strong> columns and auto-handles Aeries' standard "Print Class Rosters" report format. Common column variants are recognized.</p>
+
+          <div class="file-drop" id="file-drop-all">
+            <input type="file" id="csv-file-all" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+            <div class="drop-text">Upload Aeries roster (all classes)</div>
+            <div class="drop-help">CSV or XLSX · system auto-splits students into their periods</div>
+          </div>
+
+          <div style="margin: 16px 0; text-align: center; color: var(--ink-3); font-size: 12px;">— or —</div>
+
+          <div class="file-drop" id="file-drop-single">
+            <input type="file" id="csv-file-single" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+            <div class="drop-text">Upload one class at a time</div>
+            <div class="drop-help">If your file doesn't have period info, you'll pick which class this is for</div>
+          </div>
+
+          <div id="import-preview" style="display: none;"></div>
+        </div>
+
+        <div class="setup-card">
+          <h3>Your classes</h3>
+          <p class="help">Each class has its own roster and bathroom counter. Switch between classes from the period selector at the top of the Kiosk and Teacher view.</p>
+          <div id="period-list"></div>
+          <div style="margin-top: 12px; display: flex; gap: 8px;">
+            <button id="add-period">+ Add class manually</button>
+          </div>
+        </div>
+
+        <div class="setup-card">
+          <h3>Bathroom thresholds</h3>
+          <p class="help">Per Keller policy: 5 min warning, 10 min late, 15 min auto-referral. Adjust if needed.</p>
+          <div class="field-row">
+            <label>Warning (yellow) — min</label>
+            <input type="number" id="warn-threshold" value="5" min="1" max="60">
+          </div>
+          <div class="field-row">
+            <label>Late (red) — min</label>
+            <input type="number" id="over-threshold" value="10" min="1" max="60">
+          </div>
+          <div class="field-row">
+            <label>Auto-referral — min</label>
+            <input type="number" id="referral-threshold" value="15" min="1" max="60">
+          </div>
+          <div class="field-row">
+            <label>Bathroom passes per quarter</label>
+            <input type="number" id="quota" value="5" min="0" max="999">
+          </div>
+          <div class="field-row">
+            <label>Flag frequent late after this many</label>
+            <input type="number" id="offender-threshold" value="3" min="1" max="20">
+          </div>
+          <div style="margin-top: 12px;">
+            <button class="primary" id="save-thresholds">Save thresholds</button>
+          </div>
+        </div>
+
+        <div class="setup-card">
+          <h3>Grading period</h3>
+          <p class="help">Auto-aligned to Keller ISD 2025-26 calendar. Bathroom passes reset at the start of each new period.</p>
+          <div id="quarter-info"></div>
+          <div class="field-row" style="margin-top: 8px;">
+            <label>Use Keller ISD calendar</label>
+            <input type="checkbox" id="use-keller-cal" checked>
+          </div>
+          <div id="manual-quarter-fields" style="display: none;">
+            <div class="field-row">
+              <label>Quarter start</label>
+              <input type="date" id="quarter-start" style="width: 160px;">
+            </div>
+            <div class="field-row">
+              <label>Quarter end</label>
+              <input type="date" id="quarter-end" style="width: 160px;">
+            </div>
+          </div>
+          <div style="margin-top: 12px; display: flex; gap: 8px; flex-wrap: wrap;">
+            <button class="primary" id="save-cal">Save calendar settings</button>
+            <button class="ghost" id="reset-counts" style="color: var(--over);">Reset all bathroom counts now</button>
+          </div>
+        </div>
+
+        <div class="setup-card">
+          <h3>Backup &amp; restore</h3>
+          <p class="help">Save backups to a folder that syncs to OneDrive or Google Drive. Pick the folder once and the app remembers it — manual backups are one click, and an automatic backup runs once per school day.</p>
+          <div id="backup-status" style="font-size: 13px; color: var(--ink-2); margin-bottom: 12px;"></div>
+
+          <div id="backup-folder-section" style="background: var(--surface-2); border-radius: var(--radius); padding: 12px 14px; margin-bottom: 14px; font-size: 13px;">
+            <div id="backup-folder-text" style="margin-bottom: 8px; color: var(--ink-2); line-height: 1.5;"></div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button id="set-backup-folder-btn" style="font-size: 12px;">Pick backup folder</button>
+              <button id="clear-backup-folder-btn" style="font-size: 12px; color: var(--ink-2); display: none;">Clear folder</button>
+            </div>
+          </div>
+
+          <div class="field-row">
+            <label>Auto-backup at end of day</label>
+            <input type="checkbox" id="auto-backup-toggle" style="width: auto;">
+          </div>
+          <div class="field-row" id="auto-backup-time-row">
+            <label>Auto-backup time (24-hour)</label>
+            <input type="number" id="auto-backup-hour" min="0" max="23" value="16" style="width: 60px;">
+          </div>
+
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-top: 14px;">
+            <button class="primary" id="backup-export-btn">Save backup now</button>
+            <button id="backup-import-btn">Restore from backup</button>
+          </div>
+          <input type="file" id="backup-import-file" accept=".json,application/json" style="display: none;">
+        </div>
+
+        <div class="setup-card">
+          <h3>Install as app</h3>
+          <p class="help">Install Hall Pass as an app on this device. Gets its own icon, opens in its own window, and works without an internet connection.</p>
+          <div style="display: flex; gap: 8px;">
+            <button id="install-show-btn">How to install</button>
+          </div>
+        </div>
+
+        <div class="setup-card" style="background: var(--surface-2);">
+          <h3>How this works</h3>
+          <p class="help" style="margin-bottom: 12px;">
+            <strong>Kiosk</strong> — put your laptop or tablet by the door, screen facing students. Switch which class period is active using the pills at the top. Students scan their ID with the camera (or type it if they forgot it) and pick a destination.
+          </p>
+          <p class="help" style="margin-bottom: 12px;">
+            <strong>Teacher view</strong> — open in a separate browser tab. Same period selector, plus today's log, frequent late returns, auto-referrals, and student detail.
+          </p>
+          <p class="help" style="margin-bottom: 12px;">
+            <strong>Search</strong> — finds any student across all your classes by name or partial ID. Useful for parent emails or AP referral conversations.
+          </p>
+          <p class="help">
+            All data stays in your browser. Use Export CSV periodically to back up. If your school's ID barcodes encode something different from the visible ID number, the system will recognize the scan as "unknown" and let you map it to the right student — only needed once per kid.
+          </p>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- OVERLAYS -->
+<div class="overlay" id="overlay-camera">
+  <div class="modal">
+    <h2>Scan your ID</h2>
+    <p class="sub">Hold the barcode steady in front of the camera.</p>
+    <div id="qr-reader"></div>
+    <div class="camera-timer" id="camera-timer">Camera closes in 10s</div>
+    <div style="display: flex; gap: 8px; margin-top: 16px;">
+      <button id="cam-cancel" style="flex: 1;">Cancel</button>
+      <button id="cam-manual" style="flex: 1;">Type ID instead</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-manual">
+  <div class="modal">
+    <h2>Type your student ID</h2>
+    <p class="sub">Enter the number printed on your ID.</p>
+    <input type="text" id="manual-id" inputmode="numeric" placeholder="Student ID" style="width: 100%; font-size: 18px; text-align: center; letter-spacing: 0.1em; padding: 14px;" autocomplete="off">
+    <div style="display: flex; gap: 8px; margin-top: 16px;">
+      <button id="manual-cancel" style="flex: 1;">Cancel</button>
+      <button class="primary" id="manual-submit" style="flex: 1;">Continue</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-confirm">
+  <div class="modal" id="confirm-modal"></div>
+</div>
+
+<div class="overlay" id="overlay-add-student">
+  <div class="modal">
+    <h2 id="add-student-title">Map this scan</h2>
+    <div class="barcode-mapping-info" id="barcode-mapping-info" style="display: none;">
+      The barcode scanned doesn't match any student ID in your roster. This is normal if your school's barcodes encode something different from the printed ID number. Pick the student this barcode belongs to — the system will remember.
+    </div>
+    <p class="sub" id="add-student-sub">Add the student to your roster.</p>
+    <div id="map-existing-section" style="display: none; margin-bottom: 20px;">
+      <label style="display: block; font-size: 13px; color: var(--ink-2); margin-bottom: 4px;">Match to student in your roster</label>
+      <input type="text" id="map-search" placeholder="Type a name to search..." style="width: 100%; margin-bottom: 8px;" autocomplete="off">
+      <div id="map-results" style="max-height: 240px; overflow-y: auto;"></div>
+    </div>
+    <div id="add-new-section">
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; font-size: 13px; color: var(--ink-2); margin-bottom: 4px;">First name</label>
+        <input type="text" id="add-first" style="width: 100%;" autocomplete="off">
+      </div>
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; font-size: 13px; color: var(--ink-2); margin-bottom: 4px;">Last name</label>
+        <input type="text" id="add-last" style="width: 100%;" autocomplete="off">
+      </div>
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; font-size: 13px; color: var(--ink-2); margin-bottom: 4px;">Student ID</label>
+        <input type="text" id="add-id" style="width: 100%;" autocomplete="off">
+      </div>
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; font-size: 13px; color: var(--ink-2); margin-bottom: 4px;">Class period</label>
+        <select id="add-period" style="width: 100%;"></select>
+      </div>
+      <div style="margin-bottom: 16px;">
+        <label style="display: flex; align-items: center; gap: 8px; font-size: 13px;">
+          <input type="checkbox" id="add-accommodation">
+          <span>Has accommodation (silently exempt from quota)</span>
+        </label>
+      </div>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button id="add-cancel" style="flex: 1;">Cancel</button>
+      <button class="primary" id="add-submit" style="flex: 1;">Add as new student</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-add-period">
+  <div class="modal">
+    <h2>Add a class</h2>
+    <p class="sub">Add a class manually if you don't have a CSV to import.</p>
+    <div style="margin-bottom: 12px;">
+      <label style="display: block; font-size: 13px; color: var(--ink-2); margin-bottom: 4px;">Period name</label>
+      <input type="text" id="period-name" placeholder="e.g. Period 5, 5th, Block 2A" style="width: 100%;" autocomplete="off">
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button id="add-period-cancel" style="flex: 1;">Cancel</button>
+      <button class="primary" id="add-period-submit" style="flex: 1;">Add class</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-student-detail">
+  <div class="modal" id="student-detail-modal"></div>
+</div>
+
+<div class="overlay" id="overlay-install">
+  <div class="modal" id="install-modal">
+    <h2>Install Hall Pass</h2>
+    <p class="sub" id="install-sub">Add this app to your device.</p>
+    <div id="install-steps"></div>
+    <div style="margin-top: 16px;">
+      <button class="primary" id="install-modal-close" style="width: 100%;">Got it</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-restore-confirm">
+  <div class="modal">
+    <h2>Restore from backup?</h2>
+    <p class="sub">This will replace all current data — roster, passes, settings — with what's in the backup file. Your current data will be lost. A backup of your current data will be saved automatically before restoring.</p>
+    <div id="restore-preview" style="background: var(--surface-2); border-radius: var(--radius); padding: 12px 14px; font-size: 13px; margin-bottom: 16px; line-height: 1.6;"></div>
+    <div style="display: flex; gap: 8px;">
+      <button id="restore-cancel" style="flex: 1;">Cancel</button>
+      <button class="primary" id="restore-confirm" style="flex: 1; background: var(--over); border-color: var(--over);">Replace data</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ KELLER ISD CALENDAR ============
+const KELLER_QUARTERS = [
+  { num: 1, start: '2025-08-13', end: '2025-10-10' },
+  { num: 2, start: '2025-10-20', end: '2025-12-19' },
+  { num: 3, start: '2026-01-06', end: '2026-03-13' },
+  { num: 4, start: '2026-03-23', end: '2026-05-21' }
+];
+
+function getCurrentKellerQuarter(refDate) {
+  const ref = refDate || new Date();
+  const refMs = ref.getTime();
+  for (const q of KELLER_QUARTERS) {
+    const start = new Date(q.start + 'T00:00:00').getTime();
+    const end = new Date(q.end + 'T23:59:59').getTime();
+    if (refMs >= start && refMs <= end) return q;
+  }
+  const upcoming = KELLER_QUARTERS.find(q => new Date(q.start + 'T00:00:00').getTime() > refMs);
+  if (upcoming) return { ...upcoming, label: 'Before Q' + upcoming.num };
+  return { ...KELLER_QUARTERS[3], label: 'Past Q4' };
+}
+
+// ============ STATE ============
+const STORAGE_KEY = 'hallpass_v3';
+let state = loadState();
+let html5QrCode = null;
+let cameraTimeoutId = null;
+let cameraCountdownId = null;
+let pendingScan = null; // { rawId } when an unknown ID was scanned
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch (e) { console.error(e); }
+  return {
+    settings: {
+      teacherName: '',
+      quota: 5,
+      warnThreshold: 5,
+      overThreshold: 10,
+      referralThreshold: 15,
+      offenderThreshold: 3,
+      useKellerCalendar: true,
+      manualQuarterStart: '',
+      manualQuarterEnd: '',
+      lastQuarterReset: '',
+      lastBackupAt: null,
+      lastAutoBackupDate: null,
+      autoBackupEnabled: true,
+      autoBackupHour: 16,
+      hasBackupFolder: false,
+      installBannerDismissedAt: null,
+      backupBannerDismissedUntil: null
+    },
+    activePeriodId: null, // legacy, kept for migration only — no longer used in flow
+    periods: [], // { id, name }
+    roster: [], // { id (=studentId), firstName, lastName, periodId, accommodation }
+    barcodeMap: {}, // rawScanned -> studentId (for cases where barcode != printed ID)
+    passes: [], // { id, studentId, studentName, periodId, destination, signOutAt, signInAt, manualReturn }
+    quarterCounts: {} // studentId -> count (per-student, since each kid is in one period)
+  };
+}
+function saveState() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function uid() { return Math.random().toString(36).slice(2) + Date.now().toString(36); }
+function nowIso() { return new Date().toISOString(); }
+function fmtTime(iso) {
+  return new Date(iso).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+}
+function fmtDate(iso) {
+  return new Date(iso).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+function fmtDateLong(isoDateOnly) {
+  return new Date(isoDateOnly + 'T00:00:00').toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+}
+function fmtDuration(seconds) {
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
+function durationSec(startIso, endIso) {
+  return (new Date(endIso) - new Date(startIso)) / 1000;
+}
+function fullName(student) {
+  return `${student.firstName} ${student.lastName}`.trim();
+}
+function initials(name) {
+  return name.split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0].toUpperCase()).join('');
+}
+function shortName(name) {
+  const parts = name.split(/\s+/).filter(Boolean);
+  if (parts.length === 1) return parts[0];
+  return `${parts[0]} ${parts[parts.length - 1][0]}.`;
+}
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+function getPeriod(id) { return state.periods.find(p => p.id === id); }
+
+// ============ QUARTER ============
+function getActiveQuarter() {
+  if (state.settings.useKellerCalendar) return getCurrentKellerQuarter();
+  return { num: 'Custom', start: state.settings.manualQuarterStart, end: state.settings.manualQuarterEnd };
+}
+function checkQuarterReset() {
+  const q = getActiveQuarter();
+  const quarterKey = `${q.start}_${q.end}`;
+  if (state.settings.lastQuarterReset !== quarterKey) {
+    state.quarterCounts = {};
+    state.settings.lastQuarterReset = quarterKey;
+    saveState();
+  }
+}
+
+// ============ TABS ============
+document.querySelectorAll('.tab').forEach(btn => {
+  btn.addEventListener('click', () => {
+    const tab = btn.dataset.tab;
+    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b === btn));
+    document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === `panel-${tab}`));
+    if (tab === 'kiosk') renderKiosk();
+    if (tab === 'dash') renderDash();
+    if (tab === 'search') renderSearch();
+    if (tab === 'setup') renderSetup();
+  });
+});
+
+// ============ KIOSK ============
+function renderKiosk() {
+  const hasClasses = state.periods.length > 0;
+  document.getElementById('brand-sub').textContent = state.settings.teacherName || (hasClasses ? 'Ready' : 'Setup needed');
+  document.getElementById('kiosk-period').textContent = state.settings.teacherName
+    ? `${state.settings.teacherName}'s classroom`
+    : (hasClasses ? 'Ready to scan' : 'Open Setup to begin');
+
+  const screen = document.getElementById('kiosk-screen');
+  if (!hasClasses) {
+    screen.innerHTML = `
+      <div class="empty-state">
+        <div class="big display-font">No classes yet</div>
+        <div>Add or import a class on the Setup tab.</div>
+      </div>
+    `;
+    return;
+  }
+
+  const activePasses = getActivePasses();
+
+  if (activePasses.length === 0) {
+    screen.innerHTML = `
+      <div class="empty-state">
+        <div class="big display-font">No one out</div>
+        <div>Tap below when you're ready to leave</div>
+      </div>
+      <div class="scan-cta">
+        <button id="kiosk-scan">Scan ID</button>
+        <button class="secondary" id="kiosk-type">Type ID</button>
+      </div>
+    `;
+  } else {
+    let html = '<div class="out-list">';
+    activePasses.forEach(p => {
+      const sec = durationSec(p.signOutAt, nowIso());
+      const cls = bathroomTimeClass(p, sec);
+      html += `
+        <div class="out-row">
+          <div>
+            <div class="out-name display-font">${escapeHtml(shortName(p.studentName))}</div>
+            <div class="out-dest">${escapeHtml(p.destination)}</div>
+          </div>
+          <div>
+            <div class="out-time tabular ${cls}" data-pass-id="${p.id}">${fmtDuration(sec)}</div>
+            <div class="out-time-label">elapsed</div>
+          </div>
+        </div>
+      `;
+    });
+    html += '</div>';
+    html += `
+      <div class="scan-cta">
+        <button id="kiosk-scan">Scan ID</button>
+        <button class="secondary" id="kiosk-type">Type ID</button>
+      </div>
+    `;
+    screen.innerHTML = html;
+  }
+
+  const scanBtn = document.getElementById('kiosk-scan');
+  const typeBtn = document.getElementById('kiosk-type');
+  if (scanBtn) scanBtn.addEventListener('click', openCamera);
+  if (typeBtn) typeBtn.addEventListener('click', openManual);
+}
+
+function bathroomTimeClass(pass, sec) {
+  if (pass.destination !== 'Bathroom') return 'ok';
+  if (sec >= state.settings.referralThreshold * 60) return 'referral';
+  if (sec >= state.settings.overThreshold * 60) return 'over';
+  if (sec >= state.settings.warnThreshold * 60) return 'warn';
+  return 'ok';
+}
+
+setInterval(() => {
+  document.getElementById('kiosk-clock').textContent = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+  if (document.getElementById('panel-kiosk').classList.contains('active')) {
+    document.querySelectorAll('.out-time[data-pass-id]').forEach(el => {
+      const passId = el.dataset.passId;
+      const pass = state.passes.find(p => p.id === passId);
+      if (!pass) return;
+      const sec = durationSec(pass.signOutAt, nowIso());
+      el.textContent = fmtDuration(sec);
+      const cls = bathroomTimeClass(pass, sec);
+      el.classList.remove('ok', 'warn', 'over', 'referral');
+      el.classList.add(cls);
+    });
+  }
+  if (document.getElementById('panel-dash').classList.contains('active')) renderDashLive();
+}, 1000);
+
+// ============ CAMERA ============
+function openCamera() {
+  document.getElementById('overlay-camera').classList.add('active');
+  startCamera();
+  startCameraTimer();
+}
+function closeCamera() {
+  if (html5QrCode && html5QrCode.isScanning) html5QrCode.stop().catch(() => {});
+  if (cameraTimeoutId) { clearTimeout(cameraTimeoutId); cameraTimeoutId = null; }
+  if (cameraCountdownId) { clearInterval(cameraCountdownId); cameraCountdownId = null; }
+  document.getElementById('overlay-camera').classList.remove('active');
+}
+function startCamera() {
+  if (!html5QrCode) html5QrCode = new Html5Qrcode('qr-reader');
+  html5QrCode.start(
+    { facingMode: 'environment' },
+    { fps: 10, qrbox: { width: 280, height: 140 } },
+    (decodedText) => { onIdEntered(decodedText.trim()); closeCamera(); },
+    () => {}
+  ).catch(() => {
+    html5QrCode.start(
+      { facingMode: 'user' },
+      { fps: 10, qrbox: { width: 280, height: 140 } },
+      (decodedText) => { onIdEntered(decodedText.trim()); closeCamera(); },
+      () => {}
+    ).catch(() => {
+      toast('Camera unavailable. Type your ID instead.');
+      closeCamera();
+      openManual();
+    });
+  });
+}
+function startCameraTimer() {
+  let remaining = 10;
+  const el = document.getElementById('camera-timer');
+  el.textContent = `Camera closes in ${remaining}s`;
+  cameraCountdownId = setInterval(() => {
+    remaining--;
+    el.textContent = `Camera closes in ${remaining}s`;
+    if (remaining <= 0) clearInterval(cameraCountdownId);
+  }, 1000);
+  cameraTimeoutId = setTimeout(() => closeCamera(), 10000);
+}
+document.getElementById('cam-cancel').addEventListener('click', closeCamera);
+document.getElementById('cam-manual').addEventListener('click', () => { closeCamera(); openManual(); });
+
+// ============ MANUAL ============
+function openManual() {
+  document.getElementById('overlay-manual').classList.add('active');
+  const input = document.getElementById('manual-id');
+  input.value = '';
+  setTimeout(() => input.focus(), 50);
+}
+function closeManual() {
+  document.getElementById('overlay-manual').classList.remove('active');
+}
+document.getElementById('manual-cancel').addEventListener('click', closeManual);
+document.getElementById('manual-submit').addEventListener('click', () => {
+  const val = document.getElementById('manual-id').value.trim();
+  if (!val) return;
+  closeManual();
+  onIdEntered(val);
+});
+document.getElementById('manual-id').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('manual-submit').click();
+});
+
+// ============ ID ENTERED ============
+function onIdEntered(rawId) {
+  const normalized = rawId.replace(/\s+/g, '');
+  const resolvedId = state.barcodeMap[normalized] || normalized;
+
+  const activePass = state.passes.find(p => p.studentId === resolvedId && !p.signInAt);
+  if (activePass) { completeSignIn(activePass); return; }
+
+  const student = state.roster.find(s => s.id === resolvedId);
+  if (!student) {
+    pendingScan = { rawId: normalized };
+    openMapOrAdd(normalized);
+    return;
+  }
+  openConfirmDestination(student);
+}
+
+// ============ SIGN IN ============
+function completeSignIn(pass) {
+  pass.signInAt = nowIso();
+  pass.manualReturn = false;
+  saveState();
+  showSignedInModal(pass, durationSec(pass.signOutAt, pass.signInAt));
+}
+function showSignedInModal(pass, sec) {
+  const overlay = document.getElementById('overlay-confirm');
+  const isBath = pass.destination === 'Bathroom';
+  let cardCls = '';
+  let statusText = 'On time';
+  let statusColor = 'var(--ok)';
+  if (isBath) {
+    if (sec >= state.settings.referralThreshold * 60) {
+      cardCls = 'referral';
+      statusText = `Past ${state.settings.referralThreshold} minutes — see teacher`;
+      statusColor = 'var(--referral)';
+    } else if (sec >= state.settings.overThreshold * 60) {
+      cardCls = 'over';
+      statusText = 'Late';
+      statusColor = 'var(--over)';
+    } else if (sec >= state.settings.warnThreshold * 60) {
+      cardCls = 'warn';
+      statusText = ''; // no label, just yellow
+      statusColor = 'var(--warn)';
+    }
+  } else {
+    statusText = 'Signed in';
+  }
+  document.getElementById('confirm-modal').innerHTML = `
+    <h2>Welcome back, ${escapeHtml(pass.studentName.split(/\s+/)[0])}</h2>
+    <p class="sub">Signed back in.</p>
+    <div class="return-card ${cardCls}">
+      <div class="duration display-font">${fmtDuration(sec)}</div>
+      <div class="label">${escapeHtml(pass.destination)}${statusText ? ` · <span style="color: ${statusColor}; font-weight: 500;">${statusText}</span>` : ''}</div>
+    </div>
+    <button class="primary" style="width: 100%;" id="signed-in-close">Done</button>
+  `;
+  overlay.classList.add('active');
+  document.getElementById('signed-in-close').addEventListener('click', () => {
+    overlay.classList.remove('active');
+    renderKiosk();
+  });
+  setTimeout(() => {
+    if (overlay.classList.contains('active')) {
+      overlay.classList.remove('active');
+      renderKiosk();
+    }
+  }, 5000);
+}
+
+// ============ CONFIRM DESTINATION ============
+function openConfirmDestination(student) {
+  const overlay = document.getElementById('overlay-confirm');
+  const used = state.quarterCounts[student.id] || 0;
+  const remaining = state.settings.quota - used;
+  const accommodated = student.accommodation;
+  const blockedFromBathroom = !accommodated && remaining <= 0;
+  const name = fullName(student);
+
+  document.getElementById('confirm-modal').innerHTML = `
+    <div class="student-card">
+      <div class="avatar">${escapeHtml(initials(name))}</div>
+      <div style="flex: 1;">
+        <div class="student-name display-font">${escapeHtml(name)}</div>
+        <div class="student-id">ID ${escapeHtml(student.id)}</div>
+      </div>
+      <div class="pass-counter">
+        ${accommodated
+          ? '<div class="num display-font">—</div><div class="label">No quota</div>'
+          : `<div class="num display-font">${used} of ${state.settings.quota}</div><div class="label">Bathroom this quarter</div>`}
+      </div>
+    </div>
+    <p class="sub">Where are you going?</p>
+    <div class="dest-grid">
+      <button class="dest-btn" data-dest="Bathroom" ${blockedFromBathroom ? 'disabled' : ''}>
+        <div class="name">Bathroom</div>
+        <div class="meta">${blockedFromBathroom ? 'Out of passes — see teacher' : (accommodated ? "Doesn't count" : `${remaining} left this quarter`)}</div>
+      </button>
+      <button class="dest-btn" data-dest="Asking another teacher">
+        <div class="name">Ask another teacher</div>
+        <div class="meta">Doesn't count toward bathroom limit</div>
+      </button>
+      <button class="dest-btn" data-dest="Nurse">
+        <div class="name">Nurse</div>
+        <div class="meta">Doesn't count</div>
+      </button>
+      <button class="dest-btn" data-dest="Office / counselor">
+        <div class="name">Office or counselor</div>
+        <div class="meta">Doesn't count</div>
+      </button>
+    </div>
+    <button id="confirm-cancel" style="width: 100%;">Cancel</button>
+  `;
+  overlay.classList.add('active');
+  document.querySelectorAll('.dest-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      if (btn.disabled) return;
+      signOut(student, btn.dataset.dest);
+      overlay.classList.remove('active');
+    });
+  });
+  document.getElementById('confirm-cancel').addEventListener('click', () => {
+    overlay.classList.remove('active');
+  });
+  setTimeout(() => {
+    if (overlay.classList.contains('active')) overlay.classList.remove('active');
+  }, 30000);
+}
+function signOut(student, destination) {
+  const pass = {
+    id: uid(),
+    studentId: student.id,
+    studentName: fullName(student),
+    periodId: student.periodId,
+    destination,
+    signOutAt: nowIso(),
+    signInAt: null,
+    manualReturn: false
+  };
+  state.passes.push(pass);
+  if (destination === 'Bathroom' && !student.accommodation) {
+    state.quarterCounts[student.id] = (state.quarterCounts[student.id] || 0) + 1;
+  }
+  saveState();
+  toast(`Signed out: ${shortName(fullName(student))} → ${destination}`);
+  renderKiosk();
+}
+
+// ============ ADD STUDENT / MAP BARCODE ============
+function openMapOrAdd(scannedId) {
+  const overlay = document.getElementById('overlay-add-student');
+  document.getElementById('add-first').value = '';
+  document.getElementById('add-last').value = '';
+  document.getElementById('add-id').value = scannedId || '';
+  document.getElementById('add-accommodation').checked = false;
+  document.getElementById('map-search').value = '';
+  document.getElementById('map-results').innerHTML = '';
+
+  // Populate period selector
+  const sel = document.getElementById('add-period');
+  sel.innerHTML = state.periods.map((p, i) =>
+    `<option value="${escapeHtml(p.id)}" ${i === 0 ? 'selected' : ''}>${escapeHtml(p.name)}</option>`
+  ).join('');
+
+  // If we have any roster and a scannedId — show "map to existing" path AND "add new" path
+  const hasRoster = state.roster.length > 0;
+  document.getElementById('map-existing-section').style.display = hasRoster && scannedId ? 'block' : 'none';
+  document.getElementById('barcode-mapping-info').style.display = hasRoster && scannedId ? 'block' : 'none';
+  document.getElementById('add-student-sub').textContent = scannedId
+    ? `Scanned barcode: ${scannedId}`
+    : 'Add a student to your class roster.';
+  document.getElementById('add-student-title').textContent = scannedId ? 'Unknown ID scanned' : 'Add student';
+
+  overlay.classList.add('active');
+  setTimeout(() => {
+    if (hasRoster && scannedId) document.getElementById('map-search').focus();
+    else document.getElementById('add-first').focus();
+  }, 50);
+}
+
+document.getElementById('map-search').addEventListener('input', (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  const resultsEl = document.getElementById('map-results');
+  if (!q) { resultsEl.innerHTML = ''; return; }
+  const matches = state.roster.filter(s =>
+    fullName(s).toLowerCase().includes(q) || s.id.toLowerCase().includes(q)
+  ).slice(0, 8);
+  if (matches.length === 0) {
+    resultsEl.innerHTML = '<div style="padding: 8px; color: var(--ink-3); font-size: 13px;">No matches. Add as new below.</div>';
+    return;
+  }
+  resultsEl.innerHTML = matches.map(s => `
+    <button class="dest-btn" data-map-id="${escapeHtml(s.id)}" style="width: 100%; margin-bottom: 6px; min-height: auto; padding: 10px 14px;">
+      <div class="name">${escapeHtml(fullName(s))}</div>
+      <div class="meta">ID ${escapeHtml(s.id)} · ${escapeHtml(getPeriod(s.periodId)?.name || 'No period')}</div>
+    </button>
+  `).join('');
+  resultsEl.querySelectorAll('[data-map-id]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const targetId = btn.dataset.mapId;
+      const scannedRaw = pendingScan?.rawId;
+      if (scannedRaw) {
+        state.barcodeMap[scannedRaw] = targetId;
+        saveState();
+        toast(`Mapped barcode → ${fullName(state.roster.find(s => s.id === targetId))}`);
+      }
+      document.getElementById('overlay-add-student').classList.remove('active');
+      const student = state.roster.find(s => s.id === targetId);
+      pendingScan = null;
+      if (student) openConfirmDestination(student);
+    });
+  });
+});
+
+document.getElementById('add-cancel').addEventListener('click', () => {
+  document.getElementById('overlay-add-student').classList.remove('active');
+  pendingScan = null;
+});
+document.getElementById('add-submit').addEventListener('click', () => {
+  const firstName = document.getElementById('add-first').value.trim();
+  const lastName = document.getElementById('add-last').value.trim();
+  const id = document.getElementById('add-id').value.trim();
+  const periodId = document.getElementById('add-period').value;
+  const accommodation = document.getElementById('add-accommodation').checked;
+  if (!firstName || !lastName || !id) { toast('First name, last name, and ID required'); return; }
+  if (!periodId) { toast('Pick a class period (add one in Setup if none exist)'); return; }
+  if (state.roster.some(s => s.id === id)) { toast('That ID is already in the roster'); return; }
+  const student = { id, firstName, lastName, periodId, accommodation };
+  state.roster.push(student);
+  saveState();
+  document.getElementById('overlay-add-student').classList.remove('active');
+  toast(`Added ${fullName(student)}`);
+  if (pendingScan && pendingScan.rawId !== id) {
+    // The scanned barcode was different from the ID they entered — map it
+    state.barcodeMap[pendingScan.rawId] = id;
+    saveState();
+  }
+  const wasFromScan = !!pendingScan;
+  pendingScan = null;
+  if (wasFromScan) openConfirmDestination(student);
+  else renderSetup();
+});
+
+// ============ ANALYSIS ============
+function getActivePasses() {
+  return state.passes.filter(p => !p.signInAt)
+    .sort((a, b) => new Date(a.signOutAt) - new Date(b.signOutAt));
+}
+function getTodayPasses() {
+  const today = new Date().toDateString();
+  return state.passes.filter(p => new Date(p.signOutAt).toDateString() === today)
+    .sort((a, b) => new Date(b.signOutAt) - new Date(a.signOutAt));
+}
+function getQuarterPasses() {
+  const q = getActiveQuarter();
+  if (!q.start || !q.end) return [];
+  const startMs = new Date(q.start + 'T00:00:00').getTime();
+  const endMs = new Date(q.end + 'T23:59:59').getTime();
+  return state.passes.filter(p => {
+    const t = new Date(p.signOutAt).getTime();
+    return t >= startMs && t <= endMs;
+  });
+}
+function passDurationSec(p) {
+  return p.signInAt ? durationSec(p.signOutAt, p.signInAt) : durationSec(p.signOutAt, nowIso());
+}
+
+function getFrequentOffenders() {
+  const quarterPasses = getQuarterPasses();
+  const overTen = quarterPasses.filter(p => p.destination === 'Bathroom' && passDurationSec(p) >= state.settings.overThreshold * 60);
+  const byStudent = {};
+  overTen.forEach(p => {
+    if (!byStudent[p.studentId]) byStudent[p.studentId] = { count: 0, name: p.studentName, referrals: 0 };
+    byStudent[p.studentId].count++;
+    if (passDurationSec(p) >= state.settings.referralThreshold * 60) byStudent[p.studentId].referrals++;
+  });
+  return Object.entries(byStudent)
+    .filter(([, v]) => v.count >= state.settings.offenderThreshold)
+    .map(([id, v]) => ({ id, ...v }))
+    .sort((a, b) => b.count - a.count);
+}
+
+// ============ DASHBOARD ============
+function renderDash() {
+  document.getElementById('dash-sub').textContent = state.settings.teacherName || 'Hall pass tracker';
+  document.getElementById('dash-title').textContent = 'Today';
+
+  const q = getActiveQuarter();
+  const qLabel = q.label ? q.label : `Q${q.num} · ${fmtDateLong(q.start)} – ${fmtDateLong(q.end)}`;
+  document.getElementById('quarter-label').textContent = qLabel;
+
+  const content = document.getElementById('dash-content');
+  if (state.periods.length === 0) {
+    content.innerHTML = '<div class="empty-row">Add or import a class on the Setup tab.</div>';
+    return;
+  }
+
+  const activePasses = getActivePasses();
+  const todayPasses = getTodayPasses();
+  const todayReferrals = todayPasses.filter(p => p.destination === 'Bathroom' && passDurationSec(p) >= state.settings.referralThreshold * 60);
+  const offenders = getFrequentOffenders();
+
+  let html = '';
+
+  if (todayReferrals.length > 0) {
+    html += `
+      <div class="referral-banner">
+        <span class="icon">⚠</span>
+        <div>
+          <strong>${todayReferrals.length} bathroom pass${todayReferrals.length > 1 ? 'es' : ''} past ${state.settings.referralThreshold} min today</strong> — auto-referral per Keller policy.
+          <span style="display: block; font-size: 12px; color: var(--ink-2); margin-top: 4px;">${todayReferrals.map(r => `${shortName(r.studentName)} (${fmtDuration(passDurationSec(r))})`).join(' · ')}</span>
+        </div>
+      </div>
+    `;
+  }
+
+  html += '<div class="section-title"><span>Out right now</span><span class="count">' + activePasses.length + '</span></div>';
+  if (activePasses.length === 0) {
+    html += '<div class="out-now"><div class="empty-row">No one is currently out.</div></div>';
+  } else {
+    html += '<div class="out-now">';
+    activePasses.forEach(p => {
+      const sec = durationSec(p.signOutAt, nowIso());
+      const cls = bathroomTimeClass(p, sec);
+      const period = getPeriod(p.periodId);
+      html += `
+        <div class="out-now-row">
+          <div class="avatar" style="width: 36px; height: 36px; font-size: 13px;">${escapeHtml(initials(p.studentName))}</div>
+          <div class="info">
+            <div class="name">${escapeHtml(p.studentName)}</div>
+            <div class="meta">${period ? escapeHtml(period.name) + ' · ' : ''}${escapeHtml(p.destination)} · left ${fmtTime(p.signOutAt)}</div>
+          </div>
+          <div class="timer tabular ${cls === 'ok' ? '' : cls}" data-live-pass="${p.id}">${fmtDuration(sec)}</div>
+          <button class="ghost" data-mark-return="${p.id}">Mark returned</button>
+        </div>
+      `;
+    });
+    html += '</div>';
+  }
+
+  if (offenders.length > 0) {
+    html += '<div class="log-section"><div class="section-title"><span>Frequent late returns this quarter</span><span class="count">' + offenders.length + '</span></div>';
+    offenders.forEach(o => {
+      const student = state.roster.find(s => s.id === o.id);
+      const period = student ? getPeriod(student.periodId) : null;
+      html += `
+        <div class="offender-card" data-student-detail="${escapeHtml(o.id)}">
+          <div>
+            <div class="name">${escapeHtml(o.name)}${period ? ` <span style="color: var(--ink-3); font-weight: 400; font-size: 12px;">· ${escapeHtml(period.name)}</span>` : ''}</div>
+            <div class="stats">${o.count} late return${o.count > 1 ? 's' : ''}${o.referrals > 0 ? ` · ${o.referrals} past 15 min` : ''}</div>
+          </div>
+          <div class="arrow">→</div>
+        </div>
+      `;
+    });
+    html += '</div>';
+  }
+
+  html += '<div class="log-section"><div class="section-title"><span>Today\'s log</span><span class="count">' + todayPasses.length + '</span></div>';
+  if (todayPasses.length === 0) {
+    html += '<div class="out-now"><div class="empty-row">No passes today yet.</div></div>';
+  } else {
+    html += `<table class="log"><thead><tr><th>Student</th><th>Class</th><th>Destination</th><th>Out</th><th class="right">Length</th><th class="right">Status</th></tr></thead><tbody>`;
+    todayPasses.forEach(p => { html += renderLogRow(p, true); });
+    html += '</tbody></table></div>';
+  }
+
+  content.innerHTML = html;
+
+  document.querySelectorAll('[data-mark-return]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      markReturned(btn.dataset.markReturn);
+    });
+  });
+  document.querySelectorAll('[data-student-detail]').forEach(row => {
+    row.addEventListener('click', () => openStudentDetail(row.dataset.studentDetail));
+  });
+}
+
+function renderLogRow(p, clickable) {
+  const isOut = !p.signInAt;
+  const sec = passDurationSec(p);
+  let pillCls = isOut ? 'out' : 'back';
+  let pillText = isOut ? 'Out' : (p.manualReturn ? 'Back (manual)' : 'Back');
+  if (p.destination === 'Bathroom') {
+    if (sec >= state.settings.referralThreshold * 60) {
+      pillCls = 'referral';
+      pillText = isOut ? `Past ${state.settings.referralThreshold}` : (p.manualReturn ? `Past ${state.settings.referralThreshold} (manual)` : `Past ${state.settings.referralThreshold}`);
+    } else if (sec >= state.settings.overThreshold * 60) {
+      pillCls = 'over';
+      pillText = isOut ? 'Late' : (p.manualReturn ? 'Late (manual)' : 'Late');
+    } else if (sec >= state.settings.warnThreshold * 60 && !isOut) {
+      pillCls = 'warn';
+      pillText = p.manualReturn ? 'Over warning (manual)' : 'Over warning';
+    }
+  }
+  const period = getPeriod(p.periodId);
+  return `
+    <tr class="${clickable ? 'clickable' : ''}" ${clickable ? `data-student-detail="${escapeHtml(p.studentId)}"` : ''}>
+      <td>${escapeHtml(p.studentName)}</td>
+      <td style="color: var(--ink-2);">${period ? escapeHtml(period.name) : '—'}</td>
+      <td style="color: var(--ink-2);">${escapeHtml(p.destination)}</td>
+      <td style="color: var(--ink-2);">${fmtTime(p.signOutAt)}</td>
+      <td class="right tabular">${fmtDuration(sec)}</td>
+      <td class="right"><span class="pill ${pillCls}">${pillText}</span></td>
+    </tr>
+  `;
+}
+
+function renderDashLive() {
+  document.querySelectorAll('[data-live-pass]').forEach(el => {
+    const passId = el.dataset.livePass;
+    const pass = state.passes.find(p => p.id === passId);
+    if (!pass || pass.signInAt) return;
+    const sec = durationSec(pass.signOutAt, nowIso());
+    el.textContent = fmtDuration(sec);
+    el.classList.remove('warn', 'over', 'referral');
+    const cls = bathroomTimeClass(pass, sec);
+    if (cls !== 'ok') el.classList.add(cls);
+  });
+}
+
+function markReturned(passId) {
+  const pass = state.passes.find(p => p.id === passId);
+  if (!pass || pass.signInAt) return;
+  pass.signInAt = nowIso();
+  pass.manualReturn = true;
+  saveState();
+  toast(`${shortName(pass.studentName)} marked returned`);
+  renderDash();
+}
+
+// ============ SEARCH ============
+function renderSearch() {
+  const input = document.getElementById('search-input');
+  input.focus();
+  doSearch();
+}
+function doSearch() {
+  const q = document.getElementById('search-input').value.trim().toLowerCase();
+  const resultsEl = document.getElementById('search-results');
+  if (state.roster.length === 0) {
+    resultsEl.innerHTML = '<div class="empty-row">No students in any class yet. Add some from Setup.</div>';
+    return;
+  }
+  const list = q
+    ? state.roster.filter(s => fullName(s).toLowerCase().includes(q) || s.id.toLowerCase().includes(q))
+    : state.roster;
+  if (list.length === 0) {
+    resultsEl.innerHTML = `<div class="empty-row">No matches for "${escapeHtml(q)}".</div>`;
+    return;
+  }
+  showSearchResults(list);
+}
+function showSearchResults(students) {
+  const resultsEl = document.getElementById('search-results');
+  let html = '<div class="section-title"><span>Results</span><span class="count">' + students.length + '</span></div><div class="out-now">';
+  students.slice().sort((a, b) => fullName(a).localeCompare(fullName(b))).forEach(s => {
+    const used = state.quarterCounts[s.id] || 0;
+    const studentPasses = state.passes.filter(p => p.studentId === s.id);
+    const referrals = studentPasses.filter(p => p.destination === 'Bathroom' && passDurationSec(p) >= state.settings.referralThreshold * 60).length;
+    const overTen = studentPasses.filter(p => p.destination === 'Bathroom' && passDurationSec(p) >= state.settings.overThreshold * 60).length;
+    const period = getPeriod(s.periodId);
+    html += `
+      <div class="out-now-row" style="cursor: pointer;" data-student-detail="${escapeHtml(s.id)}">
+        <div class="avatar" style="width: 36px; height: 36px; font-size: 13px;">${escapeHtml(initials(fullName(s)))}</div>
+        <div class="info">
+          <div class="name">${escapeHtml(fullName(s))} ${s.accommodation ? '<span class="accommodation-pill" style="margin-left: 6px;">Accommodation</span>' : ''}</div>
+          <div class="meta">${period ? escapeHtml(period.name) : 'No class'} · ID ${escapeHtml(s.id)} · ${s.accommodation ? 'No quota' : `${used}/${state.settings.quota} bathroom`} · ${studentPasses.length} pass${studentPasses.length !== 1 ? 'es' : ''}${referrals > 0 ? ` · ${referrals} past 15` : ''}${overTen - referrals > 0 ? ` · ${overTen - referrals} late` : ''}</div>
+        </div>
+        <div style="color: var(--ink-3);">→</div>
+      </div>
+    `;
+  });
+  html += '</div>';
+  resultsEl.innerHTML = html;
+  document.querySelectorAll('#search-results [data-student-detail]').forEach(row => {
+    row.addEventListener('click', () => openStudentDetail(row.dataset.studentDetail));
+  });
+}
+document.getElementById('search-input').addEventListener('input', doSearch);
+
+// ============ STUDENT DETAIL ============
+function openStudentDetail(studentId) {
+  const student = state.roster.find(s => s.id === studentId);
+  if (!student) return;
+  const allPasses = state.passes.filter(p => p.studentId === studentId)
+    .sort((a, b) => new Date(b.signOutAt) - new Date(a.signOutAt));
+  const used = state.quarterCounts[studentId] || 0;
+  const completedPasses = allPasses.filter(p => p.signInAt);
+  const avgSec = completedPasses.length
+    ? completedPasses.reduce((sum, p) => sum + durationSec(p.signOutAt, p.signInAt), 0) / completedPasses.length
+    : 0;
+  const q = getActiveQuarter();
+  const quarterPasses = allPasses.filter(p => {
+    if (!q.start || !q.end) return false;
+    const t = new Date(p.signOutAt).getTime();
+    return t >= new Date(q.start + 'T00:00:00').getTime() && t <= new Date(q.end + 'T23:59:59').getTime();
+  });
+  const lateCount = quarterPasses.filter(p => p.destination === 'Bathroom' && passDurationSec(p) >= state.settings.overThreshold * 60 && passDurationSec(p) < state.settings.referralThreshold * 60).length;
+  const referralCount = quarterPasses.filter(p => p.destination === 'Bathroom' && passDurationSec(p) >= state.settings.referralThreshold * 60).length;
+  const period = getPeriod(student.periodId);
+
+  let html = `
+    <div class="student-card">
+      <div class="avatar">${escapeHtml(initials(fullName(student)))}</div>
+      <div style="flex: 1;">
+        <div class="student-name display-font">${escapeHtml(fullName(student))}</div>
+        <div class="student-id">${period ? escapeHtml(period.name) : 'No class'} · ID ${escapeHtml(student.id)} ${student.accommodation ? '<span class="accommodation-pill" style="margin-left: 8px;">Accommodation</span>' : ''}</div>
+      </div>
+    </div>
+    <div style="display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 8px; margin-bottom: 20px;">
+      <div style="background: var(--surface-2); border-radius: var(--radius); padding: 12px;">
+        <div style="font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px;">Bathroom</div>
+        <div class="display-font" style="font-size: 20px; font-weight: 500;">${student.accommodation ? '—' : `${used}/${state.settings.quota}`}</div>
+        <div style="font-size: 10px; color: var(--ink-3);">this quarter</div>
+      </div>
+      <div style="background: var(--surface-2); border-radius: var(--radius); padding: 12px;">
+        <div style="font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px;">Avg duration</div>
+        <div class="display-font" style="font-size: 20px; font-weight: 500;">${avgSec ? fmtDuration(avgSec) : '—'}</div>
+        <div style="font-size: 10px; color: var(--ink-3);">all time</div>
+      </div>
+      <div style="background: ${lateCount > 0 ? '#faedda' : 'var(--surface-2)'}; border-radius: var(--radius); padding: 12px;">
+        <div style="font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px;">Late returns</div>
+        <div class="display-font" style="font-size: 20px; font-weight: 500; color: ${lateCount > 0 ? '#633806' : 'var(--ink)'};">${lateCount}</div>
+        <div style="font-size: 10px; color: var(--ink-3);">10–15 min, this quarter</div>
+      </div>
+      <div style="background: ${referralCount > 0 ? '#fbe5e5' : 'var(--surface-2)'}; border-radius: var(--radius); padding: 12px;">
+        <div style="font-size: 10px; color: var(--ink-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 4px;">Past 15 min</div>
+        <div class="display-font" style="font-size: 20px; font-weight: 500; color: ${referralCount > 0 ? 'var(--referral)' : 'var(--ink)'};">${referralCount}</div>
+        <div style="font-size: 10px; color: var(--ink-3);">this quarter</div>
+      </div>
+    </div>
+    <div class="section-title"><span>Pass history</span><span class="count">${allPasses.length}</span></div>
+  `;
+  if (allPasses.length === 0) {
+    html += '<div style="text-align: center; color: var(--ink-3); padding: 24px;">No passes yet.</div>';
+  } else {
+    html += '<table class="log"><thead><tr><th>Date</th><th>Destination</th><th class="right">Length</th><th class="right">Status</th></tr></thead><tbody>';
+    allPasses.slice(0, 30).forEach(p => {
+      const isOut = !p.signInAt;
+      const sec = passDurationSec(p);
+      let pillCls = isOut ? 'out' : 'back';
+      let pillText = isOut ? 'Out' : 'Back';
+      if (p.destination === 'Bathroom') {
+        if (sec >= state.settings.referralThreshold * 60) { pillCls = 'referral'; pillText = `Past ${state.settings.referralThreshold}`; }
+        else if (sec >= state.settings.overThreshold * 60) { pillCls = 'over'; pillText = 'Late'; }
+        else if (sec >= state.settings.warnThreshold * 60 && !isOut) { pillCls = 'warn'; pillText = 'Warning'; }
+      }
+      if (p.manualReturn && !isOut) pillText += ' (manual)';
+      html += `
+        <tr>
+          <td>${fmtDate(p.signOutAt)} <span style="color: var(--ink-3); font-size: 12px;">${fmtTime(p.signOutAt)}</span></td>
+          <td style="color: var(--ink-2);">${escapeHtml(p.destination)}</td>
+          <td class="right tabular">${fmtDuration(sec)}</td>
+          <td class="right"><span class="pill ${pillCls}">${pillText}</span></td>
+        </tr>
+      `;
+    });
+    html += '</tbody></table>';
+    if (allPasses.length > 30) {
+      html += `<div style="text-align: center; padding: 12px; color: var(--ink-3); font-size: 12px;">Showing 30 of ${allPasses.length}. Use Export CSV for full history.</div>`;
+    }
+  }
+  html += '<div style="margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap;">';
+  html += `<button id="detail-change-class" style="flex: 1;">Change class</button>`;
+  html += `<button id="detail-toggle-acc" style="flex: 1;">${student.accommodation ? 'Remove accommodation' : 'Mark as accommodated'}</button>`;
+  html += '<button class="primary" id="detail-close" style="flex: 1;">Close</button>';
+  html += '</div>';
+
+  document.getElementById('student-detail-modal').innerHTML = html;
+  document.getElementById('overlay-student-detail').classList.add('active');
+  document.getElementById('detail-close').addEventListener('click', () => {
+    document.getElementById('overlay-student-detail').classList.remove('active');
+  });
+  document.getElementById('detail-toggle-acc').addEventListener('click', () => {
+    student.accommodation = !student.accommodation;
+    saveState();
+    toast(student.accommodation ? 'Marked as accommodated' : 'Accommodation removed');
+    document.getElementById('overlay-student-detail').classList.remove('active');
+    if (document.getElementById('panel-search').classList.contains('active')) renderSearch();
+    if (document.getElementById('panel-setup').classList.contains('active')) renderSetup();
+  });
+  document.getElementById('detail-change-class').addEventListener('click', () => {
+    openChangeClass(student);
+  });
+}
+
+function openChangeClass(student) {
+  if (state.periods.length === 0) { toast('No classes available'); return; }
+  const otherPeriods = state.periods.filter(p => p.id !== student.periodId);
+  if (otherPeriods.length === 0) {
+    toast('Only one class exists — add another in Setup before moving students');
+    return;
+  }
+  const currentPeriod = getPeriod(student.periodId);
+  const choices = otherPeriods.map((p, i) => `${i + 1}. ${p.name}`).join('\n');
+  const choice = prompt(
+    `Move ${fullName(student)} from "${currentPeriod ? currentPeriod.name : 'no class'}" to which class? Type the number:\n\n${choices}\n\nTheir bathroom count and pass history follow them. Past pass records keep their original class label so the history is accurate.`
+  );
+  if (!choice) return;
+  const idx = parseInt(choice) - 1;
+  if (isNaN(idx) || idx < 0 || idx >= otherPeriods.length) { toast('Invalid choice'); return; }
+  const newPeriod = otherPeriods[idx];
+  student.periodId = newPeriod.id;
+  saveState();
+  toast(`${fullName(student)} moved to ${newPeriod.name}`);
+  document.getElementById('overlay-student-detail').classList.remove('active');
+  if (document.getElementById('panel-search').classList.contains('active')) renderSearch();
+  if (document.getElementById('panel-setup').classList.contains('active')) renderSetup();
+  if (document.getElementById('panel-dash').classList.contains('active')) renderDash();
+}
+
+// ============ EXPORT ============
+document.getElementById('export-btn').addEventListener('click', () => {
+  if (state.passes.length === 0) { toast('No passes to export'); return; }
+  const rows = [['Student', 'Student ID', 'Class', 'Destination', 'Sign Out', 'Sign In', 'Duration (min)', 'Status', 'Manual Return']];
+  state.passes.forEach(p => {
+    const dur = p.signInAt ? (durationSec(p.signOutAt, p.signInAt) / 60).toFixed(1) : '';
+    let status = '';
+    if (p.signInAt && p.destination === 'Bathroom') {
+      const sec = durationSec(p.signOutAt, p.signInAt);
+      if (sec >= state.settings.referralThreshold * 60) status = `Past ${state.settings.referralThreshold} min`;
+      else if (sec >= state.settings.overThreshold * 60) status = 'Late';
+      else if (sec >= state.settings.warnThreshold * 60) status = 'Warning';
+      else status = 'On time';
+    } else if (!p.signInAt) status = 'Still out';
+    else status = 'Returned';
+    const period = getPeriod(p.periodId);
+    rows.push([
+      p.studentName, p.studentId, period ? period.name : '',
+      p.destination,
+      new Date(p.signOutAt).toLocaleString(),
+      p.signInAt ? new Date(p.signInAt).toLocaleString() : '',
+      dur, status,
+      p.manualReturn ? 'Yes' : ''
+    ]);
+  });
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `hallpass_${new Date().toISOString().split('T')[0]}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+});
+
+// ============ SETUP ============
+function renderSetup() {
+  document.getElementById('teacher-name').value = state.settings.teacherName || '';
+  document.getElementById('quota').value = state.settings.quota;
+  document.getElementById('warn-threshold').value = state.settings.warnThreshold;
+  document.getElementById('over-threshold').value = state.settings.overThreshold;
+  document.getElementById('referral-threshold').value = state.settings.referralThreshold;
+  document.getElementById('offender-threshold').value = state.settings.offenderThreshold;
+  document.getElementById('use-keller-cal').checked = state.settings.useKellerCalendar;
+  document.getElementById('quarter-start').value = state.settings.manualQuarterStart || '';
+  document.getElementById('quarter-end').value = state.settings.manualQuarterEnd || '';
+  document.getElementById('manual-quarter-fields').style.display = state.settings.useKellerCalendar ? 'none' : 'block';
+  renderBackupStatus();
+
+  const q = getActiveQuarter();
+  const qInfo = document.getElementById('quarter-info');
+  if (q.start && q.end) {
+    qInfo.innerHTML = `
+      <div style="background: var(--surface-2); border-radius: var(--radius); padding: 12px 14px; font-size: 13px;">
+        <div style="font-weight: 500; margin-bottom: 4px;">Currently: ${q.label || `Quarter ${q.num}`}</div>
+        <div style="color: var(--ink-2);">${fmtDateLong(q.start)} – ${fmtDateLong(q.end)}</div>
+      </div>
+    `;
+  } else {
+    qInfo.innerHTML = '<div style="font-size: 13px; color: var(--ink-3);">No active quarter set.</div>';
+  }
+
+  // Period list
+  const list = document.getElementById('period-list');
+  if (state.periods.length === 0) {
+    list.innerHTML = '<div style="text-align: center; color: var(--ink-3); padding: 16px; font-size: 13px;">No classes yet. Upload a CSV or add a class manually.</div>';
+    return;
+  }
+  let html = '<div class="period-list">';
+  state.periods.forEach(p => {
+    const studentsInPeriod = state.roster.filter(s => s.periodId === p.id);
+    html += `
+      <div class="period-row">
+        <div class="info">
+          <div class="name">${escapeHtml(p.name)}</div>
+          <div class="meta">${studentsInPeriod.length} student${studentsInPeriod.length !== 1 ? 's' : ''}</div>
+        </div>
+        <button class="ghost" data-view-period="${escapeHtml(p.id)}">View students</button>
+        <button class="ghost" data-rename-period="${escapeHtml(p.id)}">Rename</button>
+        <button class="ghost" data-delete-period="${escapeHtml(p.id)}" style="color: var(--over);">Delete</button>
+      </div>
+    `;
+  });
+  html += '</div>';
+  list.innerHTML = html;
+
+  document.querySelectorAll('[data-view-period]').forEach(btn => {
+    btn.addEventListener('click', () => viewPeriodStudents(btn.dataset.viewPeriod));
+  });
+  document.querySelectorAll('[data-rename-period]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = getPeriod(btn.dataset.renamePeriod);
+      const newName = prompt(`Rename "${p.name}" to:`, p.name);
+      if (newName && newName.trim()) { p.name = newName.trim(); saveState(); renderSetup(); }
+    });
+  });
+  document.querySelectorAll('[data-delete-period]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const p = getPeriod(btn.dataset.deletePeriod);
+      const studentsInPeriod = state.roster.filter(s => s.periodId === p.id);
+      if (!confirm(`Delete "${p.name}"? This will also remove ${studentsInPeriod.length} student${studentsInPeriod.length !== 1 ? 's' : ''} from your roster. Pass history is kept.`)) return;
+      state.periods = state.periods.filter(x => x.id !== p.id);
+      state.roster = state.roster.filter(s => s.periodId !== p.id);
+      if (state.activePeriodId === p.id) state.activePeriodId = state.periods[0]?.id || null;
+      saveState();
+      renderSetup();
+    });
+  });
+}
+
+function viewPeriodStudents(periodId) {
+  document.querySelector('[data-tab="search"]').click();
+  document.getElementById('search-input').value = '';
+  const period = getPeriod(periodId);
+  const list = state.roster.filter(s => s.periodId === periodId);
+  showSearchResults(list);
+  document.getElementById('search-input').placeholder = `Showing ${period.name} · clear to search all`;
+}
+
+document.getElementById('use-keller-cal').addEventListener('change', (e) => {
+  document.getElementById('manual-quarter-fields').style.display = e.target.checked ? 'none' : 'block';
+});
+
+document.getElementById('save-teacher').addEventListener('click', () => {
+  state.settings.teacherName = document.getElementById('teacher-name').value.trim();
+  saveState();
+  toast('Saved');
+});
+
+document.getElementById('save-thresholds').addEventListener('click', () => {
+  state.settings.quota = parseInt(document.getElementById('quota').value) || 5;
+  state.settings.warnThreshold = parseInt(document.getElementById('warn-threshold').value) || 5;
+  state.settings.overThreshold = parseInt(document.getElementById('over-threshold').value) || 10;
+  state.settings.referralThreshold = parseInt(document.getElementById('referral-threshold').value) || 15;
+  state.settings.offenderThreshold = parseInt(document.getElementById('offender-threshold').value) || 3;
+  saveState();
+  toast('Thresholds saved');
+});
+
+document.getElementById('save-cal').addEventListener('click', () => {
+  state.settings.useKellerCalendar = document.getElementById('use-keller-cal').checked;
+  state.settings.manualQuarterStart = document.getElementById('quarter-start').value;
+  state.settings.manualQuarterEnd = document.getElementById('quarter-end').value;
+  saveState();
+  checkQuarterReset();
+  toast('Calendar saved');
+  renderSetup();
+});
+
+document.getElementById('reset-counts').addEventListener('click', () => {
+  if (confirm('Reset bathroom counts for all students across all classes? Pass history is kept.')) {
+    state.quarterCounts = {};
+    saveState();
+    toast('Bathroom counts reset');
+    renderSetup();
+  }
+});
+
+// Add period manually
+document.getElementById('add-period').addEventListener('click', () => {
+  document.getElementById('overlay-add-period').classList.add('active');
+  document.getElementById('period-name').value = '';
+  setTimeout(() => document.getElementById('period-name').focus(), 50);
+});
+document.getElementById('add-period-cancel').addEventListener('click', () => {
+  document.getElementById('overlay-add-period').classList.remove('active');
+});
+document.getElementById('add-period-submit').addEventListener('click', () => {
+  const name = document.getElementById('period-name').value.trim();
+  if (!name) { toast('Period name required'); return; }
+  if (state.periods.some(p => p.name.toLowerCase() === name.toLowerCase())) {
+    toast('A class with that name already exists'); return;
+  }
+  const period = { id: uid(), name };
+  state.periods.push(period);
+  if (!state.activePeriodId) state.activePeriodId = period.id;
+  saveState();
+  document.getElementById('overlay-add-period').classList.remove('active');
+  toast(`Added ${name}`);
+  renderSetup();
+});
+
+// ============ FILE IMPORT (CSV + XLSX) ============
+
+// Read any tabular file into a 2D array of strings
+async function readFileAsRows(file) {
+  const ext = file.name.toLowerCase().split('.').pop();
+  if (ext === 'xlsx' || ext === 'xls') {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    // Use first sheet
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    // header:1 returns array of arrays; defval:'' for empty cells; raw:false to coerce to strings
+    const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '', raw: false });
+    return rows.map(r => r.map(c => c == null ? '' : String(c)));
+  }
+  // CSV / plain text
+  const text = await file.text();
+  return parseCsv(text);
+}
+
+function parseCsv(text) {
+  const lines = text.split(/\r?\n/).filter(l => l.trim());
+  return lines.map(line => {
+    const result = []; let cur = ''; let inQuote = false;
+    for (let i = 0; i < line.length; i++) {
+      const c = line[i];
+      if (c === '"') { inQuote = !inQuote; continue; }
+      if (c === ',' && !inQuote) { result.push(cur); cur = ''; continue; }
+      cur += c;
+    }
+    result.push(cur);
+    return result;
+  });
+}
+
+function findColumn(headers, candidates) {
+  for (const c of candidates) {
+    const idx = headers.findIndex(h => h === c.toLowerCase() || h.replace(/[\s_-]/g, '') === c.toLowerCase().replace(/[\s_-]/g, ''));
+    if (idx !== -1) return idx;
+  }
+  return -1;
+}
+
+// Split "Last, First M" into firstName / lastName, stripping middle initial
+function splitAeriesName(name) {
+  const trimmed = String(name).trim();
+  if (trimmed.includes(',')) {
+    const [last, rest] = trimmed.split(',').map(s => s.trim());
+    // rest may be "First M" or "First Middle M"
+    // Strip a single trailing letter token (middle initial)
+    const restParts = rest.split(/\s+/).filter(Boolean);
+    let firstName;
+    if (restParts.length > 1 && restParts[restParts.length - 1].length === 1) {
+      firstName = restParts.slice(0, -1).join(' ');
+    } else {
+      firstName = restParts.join(' ');
+    }
+    return { firstName: firstName || rest, lastName: last };
+  }
+  // "First Last" fallback
+  const parts = trimmed.split(/\s+/);
+  return { firstName: parts[0] || '', lastName: parts.slice(1).join(' ') };
+}
+
+// Detect Aeries "Print Class Rosters" format and parse it.
+// Returns null if not Aeries format, or { byPeriod: { periodName: [{firstName, lastName, id}] } }
+function tryParseAeriesRoster(rows) {
+  // Look for a row whose col 0 starts with a digit followed by a time pattern (e.g. "1 8:30AM-9:20AM")
+  const periodHeaderRe = /^(\d+)\s+\d{1,2}:\d{2}\s*(AM|PM)/i;
+
+  // Quick check: any row matches the period header pattern?
+  let foundAny = false;
+  for (let i = 0; i < Math.min(rows.length, 50); i++) {
+    const v = (rows[i][0] || '').toString();
+    if (periodHeaderRe.test(v)) { foundAny = true; break; }
+  }
+  if (!foundAny) return null;
+
+  // Walk rows, collecting students per period
+  const byPeriod = {};
+  let currentPeriod = null;
+
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    const col0 = (row[0] || '').toString().trim();
+
+    // Period header?
+    const m = col0.match(periodHeaderRe);
+    if (m) {
+      currentPeriod = `Period ${m[1]}`;
+      if (!byPeriod[currentPeriod]) byPeriod[currentPeriod] = [];
+      continue;
+    }
+
+    if (!currentPeriod) continue;
+
+    // Student row pattern: col 0 is a small integer (the row number), col 1 is student ID, col 4 is "Last, First M"
+    // Other columns may contain grade in col 10, but we don't need it
+    const isRowNum = /^\d{1,3}$/.test(col0);
+    if (!isRowNum) continue;
+    const sid = (row[1] || '').toString().trim();
+    const name = (row[4] || '').toString().trim();
+    if (!sid || !name || !name.includes(',')) continue;
+
+    const { firstName, lastName } = splitAeriesName(name);
+    if (firstName && lastName) {
+      byPeriod[currentPeriod].push({ firstName, lastName, id: sid });
+    }
+  }
+
+  // Return null if we found period headers but no students (false positive)
+  const totalStudents = Object.values(byPeriod).reduce((sum, arr) => sum + arr.length, 0);
+  if (totalStudents === 0) return null;
+
+  return { byPeriod };
+}
+
+// Detect column-header format and parse it.
+// Returns null if no recognizable header, otherwise { byPeriod } if periodColPresent, or { flat: [...] }
+function tryParseColumnFormat(rows) {
+  if (rows.length < 2) return null;
+  const headers = rows[0].map(h => (h || '').toString().toLowerCase().trim());
+
+  const firstIdx = findColumn(headers, ['firstname', 'first name', 'first', 'studentfirstname', 'student first name']);
+  const lastIdx = findColumn(headers, ['lastname', 'last name', 'last', 'studentlastname', 'student last name']);
+  const idIdx = findColumn(headers, ['studentid', 'student id', 'permanentid', 'permanent id', 'permid', 'id', 'studentnumber', 'student number']);
+  const periodIdx = findColumn(headers, ['period', 'per', 'classperiod', 'class period', 'block']);
+  const nameIdx = findColumn(headers, ['name', 'studentname', 'student name', 'fullname', 'full name']);
+
+  // Need at least an ID column
+  if (idIdx === -1) return null;
+  // Need either first+last OR a single name column
+  const hasFirstLast = firstIdx !== -1 && lastIdx !== -1;
+  if (!hasFirstLast && nameIdx === -1) return null;
+
+  const flat = [];
+  const byPeriod = {};
+  for (let i = 1; i < rows.length; i++) {
+    const r = rows[i];
+    const id = (r[idIdx] || '').toString().trim();
+    if (!id) continue;
+    let firstName, lastName;
+    if (hasFirstLast) {
+      firstName = (r[firstIdx] || '').toString().trim();
+      lastName = (r[lastIdx] || '').toString().trim();
+    } else {
+      const split = splitAeriesName((r[nameIdx] || '').toString());
+      firstName = split.firstName;
+      lastName = split.lastName;
+    }
+    if (!firstName || !lastName) continue;
+
+    const student = { firstName, lastName, id };
+
+    if (periodIdx !== -1) {
+      const per = (r[periodIdx] || '').toString().trim();
+      if (!per) continue;
+      const periodName = /^\d+$/.test(per) ? `Period ${per}` : per;
+      if (!byPeriod[periodName]) byPeriod[periodName] = [];
+      byPeriod[periodName].push(student);
+    } else {
+      flat.push(student);
+    }
+  }
+
+  if (periodIdx !== -1) {
+    return Object.keys(byPeriod).length > 0 ? { byPeriod } : null;
+  }
+  return flat.length > 0 ? { flat } : null;
+}
+
+// Apply a parsed result (with byPeriod) to state
+function applyByPeriod(byPeriod) {
+  const periodNames = Object.keys(byPeriod).sort((a, b) => {
+    // Try to sort numerically by period number when possible
+    const ma = a.match(/(\d+)/);
+    const mb = b.match(/(\d+)/);
+    if (ma && mb) return parseInt(ma[1]) - parseInt(mb[1]);
+    return a.localeCompare(b);
+  });
+  let added = 0, skipped = 0;
+  periodNames.forEach(pn => {
+    let period = state.periods.find(p => p.name.toLowerCase() === pn.toLowerCase());
+    if (!period) {
+      period = { id: uid(), name: pn };
+      state.periods.push(period);
+    }
+    byPeriod[pn].forEach(s => {
+      if (state.roster.some(r => r.id === s.id)) { skipped++; return; }
+      state.roster.push({ ...s, periodId: period.id, accommodation: false });
+      added++;
+    });
+  });
+  saveState();
+  return {
+    periods: periodNames.map(pn => ({ name: pn, count: byPeriod[pn].length })),
+    added, skipped
+  };
+}
+
+// Apply a flat (no period) student list to a chosen period
+function applyFlatToPeriod(students, periodName) {
+  const cleanName = periodName.trim();
+  let period = state.periods.find(p => p.name.toLowerCase() === cleanName.toLowerCase());
+  if (!period) {
+    period = { id: uid(), name: cleanName };
+    state.periods.push(period);
+  }
+  let added = 0, skipped = 0;
+  students.forEach(s => {
+    if (state.roster.some(r => r.id === s.id)) { skipped++; return; }
+    state.roster.push({ ...s, periodId: period.id, accommodation: false });
+    added++;
+  });
+  saveState();
+  return {
+    periods: [{ name: cleanName, count: students.length }],
+    added, skipped
+  };
+}
+
+const fileDropAll = document.getElementById('file-drop-all');
+const csvFileAll = document.getElementById('csv-file-all');
+fileDropAll.addEventListener('click', () => csvFileAll.click());
+fileDropAll.addEventListener('dragover', (e) => { e.preventDefault(); fileDropAll.style.background = 'var(--surface-2)'; });
+fileDropAll.addEventListener('dragleave', () => { fileDropAll.style.background = ''; });
+fileDropAll.addEventListener('drop', (e) => {
+  e.preventDefault();
+  fileDropAll.style.background = '';
+  if (e.dataTransfer.files.length) handleAllImport(e.dataTransfer.files[0]);
+});
+csvFileAll.addEventListener('change', (e) => { if (e.target.files.length) handleAllImport(e.target.files[0]); });
+
+const fileDropSingle = document.getElementById('file-drop-single');
+const csvFileSingle = document.getElementById('csv-file-single');
+fileDropSingle.addEventListener('click', () => csvFileSingle.click());
+fileDropSingle.addEventListener('dragover', (e) => { e.preventDefault(); fileDropSingle.style.background = 'var(--surface-2)'; });
+fileDropSingle.addEventListener('dragleave', () => { fileDropSingle.style.background = ''; });
+fileDropSingle.addEventListener('drop', (e) => {
+  e.preventDefault();
+  fileDropSingle.style.background = '';
+  if (e.dataTransfer.files.length) handleSingleImport(e.dataTransfer.files[0]);
+});
+csvFileSingle.addEventListener('change', (e) => { if (e.target.files.length) handleSingleImport(e.target.files[0]); });
+
+async function handleAllImport(file) {
+  let rows;
+  try {
+    rows = await readFileAsRows(file);
+  } catch (err) {
+    toast('Could not read file: ' + err.message);
+    return;
+  }
+  if (rows.length < 2) { toast('File looks empty'); return; }
+
+  // Try Aeries Print Class Rosters format first (most likely if XLSX from Aeries)
+  let result = tryParseAeriesRoster(rows);
+  if (result && result.byPeriod) {
+    const summary = applyByPeriod(result.byPeriod);
+    showImportPreview({ mode: 'all', ...summary });
+    renderSetup();
+    return;
+  }
+
+  // Then try column-header format with period column
+  result = tryParseColumnFormat(rows);
+  if (result && result.byPeriod) {
+    const summary = applyByPeriod(result.byPeriod);
+    showImportPreview({ mode: 'all', ...summary });
+    renderSetup();
+    return;
+  }
+
+  if (result && result.flat) {
+    toast('No period info found — use the single-class import below');
+    return;
+  }
+
+  toast('Could not parse file — need student IDs and names, plus period info');
+}
+
+async function handleSingleImport(file) {
+  let rows;
+  try {
+    rows = await readFileAsRows(file);
+  } catch (err) {
+    toast('Could not read file: ' + err.message);
+    return;
+  }
+  if (rows.length < 2) { toast('File looks empty'); return; }
+
+  // Even in single-class mode, if Aeries format is detected, treat it as multi-class
+  let aeries = tryParseAeriesRoster(rows);
+  if (aeries && aeries.byPeriod) {
+    const periodNames = Object.keys(aeries.byPeriod);
+    if (periodNames.length > 1) {
+      if (!confirm(`This file contains ${periodNames.length} class periods. Import all of them?`)) return;
+      const summary = applyByPeriod(aeries.byPeriod);
+      showImportPreview({ mode: 'all', ...summary });
+      renderSetup();
+      return;
+    }
+    // Only one period — fall through to single-class flow with that period as default
+    const onlyPeriod = periodNames[0];
+    const periodName = prompt(`This file contains ${onlyPeriod}. Import as which class? (Press OK to keep "${onlyPeriod}")`, onlyPeriod);
+    if (!periodName || !periodName.trim()) return;
+    const summary = applyFlatToPeriod(aeries.byPeriod[onlyPeriod], periodName);
+    showImportPreview({ mode: 'single', ...summary });
+    renderSetup();
+    return;
+  }
+
+  // Try column format
+  const result = tryParseColumnFormat(rows);
+  let students;
+  if (result && result.flat) {
+    students = result.flat;
+  } else if (result && result.byPeriod) {
+    // Has period column — flatten and ignore
+    students = Object.values(result.byPeriod).flat();
+  } else {
+    toast('Could not parse — need columns for First/Last name (or Name) and Student ID');
+    return;
+  }
+
+  const periodName = prompt(`Which class is this file for? Type a name (e.g. "Period 5"). Existing classes: ${state.periods.map(p => p.name).join(', ') || '(none yet)'}`);
+  if (!periodName || !periodName.trim()) return;
+  const summary = applyFlatToPeriod(students, periodName);
+  showImportPreview({ mode: 'single', ...summary });
+  renderSetup();
+}
+
+function showImportPreview(result) {
+  const el = document.getElementById('import-preview');
+  let html = '<div class="import-preview"><div class="import-preview-summary">Imported ' + result.added + ' student' + (result.added !== 1 ? 's' : '');
+  if (result.skipped > 0) html += `, skipped ${result.skipped} duplicate${result.skipped !== 1 ? 's' : ''}`;
+  html += '</div><div class="import-preview-list">';
+  result.periods.forEach(p => {
+    html += `<div>• ${escapeHtml(p.name)}: ${p.count} student${p.count !== 1 ? 's' : ''}</div>`;
+  });
+  html += '</div></div>';
+  el.innerHTML = html;
+  el.style.display = 'block';
+}
+
+// ============ TOAST ============
+function toast(msg) {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 2400);
+}
+
+// ============ BACKUP / RESTORE ============
+const BACKUP_VERSION = 1;
+
+// IndexedDB helpers — used to persist the backup folder handle across sessions
+// (FileSystemDirectoryHandle objects can't be stored in localStorage)
+const IDB_NAME = 'hallpass_db';
+const IDB_STORE = 'handles';
+
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(IDB_NAME, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(IDB_STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbSet(key, value) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).put(value, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function idbGet(key) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readonly');
+    const req = tx.objectStore(IDB_STORE).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function idbDel(key) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(IDB_STORE, 'readwrite');
+    tx.objectStore(IDB_STORE).delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+const FS_ACCESS_SUPPORTED = 'showDirectoryPicker' in window;
+let backupFolderHandle = null; // populated on init if previously selected
+
+function buildBackup() {
+  return {
+    backupVersion: BACKUP_VERSION,
+    appVersion: 'v7',
+    createdAt: nowIso(),
+    state: state
+  };
+}
+
+function backupFilename(prefix) {
+  const date = new Date().toISOString().split('T')[0];
+  const teacherSlug = (state.settings.teacherName || 'hallpass').replace(/[^a-zA-Z0-9_-]+/g, '_');
+  return `${prefix || 'hallpass_backup'}_${teacherSlug}_${date}.json`;
+}
+
+// Verify we still have permission to write to the saved folder
+async function verifyFolderPermission(handle, requestIfNeeded) {
+  if (!handle) return false;
+  try {
+    const opts = { mode: 'readwrite' };
+    let perm = await handle.queryPermission(opts);
+    if (perm === 'granted') return true;
+    if (requestIfNeeded) {
+      perm = await handle.requestPermission(opts);
+      return perm === 'granted';
+    }
+    return false;
+  } catch (err) {
+    return false;
+  }
+}
+
+async function pickBackupFolder() {
+  if (!FS_ACCESS_SUPPORTED) {
+    toast('This browser doesn\'t support folder picking. Backups will save to Downloads instead.');
+    return;
+  }
+  try {
+    const handle = await window.showDirectoryPicker({ mode: 'readwrite', startIn: 'documents' });
+    backupFolderHandle = handle;
+    await idbSet('backupFolder', handle);
+    state.settings.hasBackupFolder = true;
+    saveState();
+    toast(`Backup folder set: ${handle.name}`);
+    renderBackupStatus();
+  } catch (err) {
+    if (err.name !== 'AbortError') {
+      toast('Could not set folder: ' + err.message);
+    }
+  }
+}
+
+async function clearBackupFolder() {
+  if (!confirm('Stop saving backups to the current folder? Future backups will save to your Downloads folder.')) return;
+  backupFolderHandle = null;
+  await idbDel('backupFolder');
+  state.settings.hasBackupFolder = false;
+  saveState();
+  toast('Backup folder cleared');
+  renderBackupStatus();
+}
+
+// Save backup using whichever method is available
+async function writeBackup(prefix) {
+  const filename = backupFilename(prefix);
+  const data = JSON.stringify(buildBackup(), null, 2);
+
+  // Try the saved folder if we have one and permission still works
+  if (FS_ACCESS_SUPPORTED && backupFolderHandle) {
+    const ok = await verifyFolderPermission(backupFolderHandle, true);
+    if (ok) {
+      try {
+        const fileHandle = await backupFolderHandle.getFileHandle(filename, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(data);
+        await writable.close();
+        return { method: 'folder', folderName: backupFolderHandle.name, filename };
+      } catch (err) {
+        console.error('Folder write failed:', err);
+        toast('Could not write to folder — saving to Downloads instead');
+        // Fall through to download
+      }
+    } else {
+      toast('Lost permission to backup folder — saving to Downloads');
+    }
+  }
+
+  // Fallback: download to Downloads folder
+  const blob = new Blob([data], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+  return { method: 'download', filename };
+}
+
+async function backupExport(isAuto) {
+  const result = await writeBackup(isAuto ? 'hallpass_autobackup' : 'hallpass_backup');
+  state.settings.lastBackupAt = nowIso();
+  if (isAuto) {
+    state.settings.lastAutoBackupDate = new Date().toDateString();
+  }
+  saveState();
+  if (!isAuto) {
+    if (result.method === 'folder') {
+      toast(`Saved to ${result.folderName} — syncing to cloud automatically`);
+    } else {
+      toast('Saved to Downloads — move it to OneDrive or Google Drive');
+    }
+  } else {
+    if (result.method === 'folder') {
+      toast(`Auto-backup saved to ${result.folderName}`);
+    }
+    // No toast for auto-download — too disruptive if it fires while teaching
+  }
+  updateBackupBanner();
+  renderBackupStatus();
+}
+
+let pendingRestore = null;
+
+function previewBackup(parsed) {
+  const s = parsed.state || {};
+  const passCount = (s.passes || []).length;
+  const rosterCount = (s.roster || []).length;
+  const periodCount = (s.periods || []).length;
+  const teacher = s.settings?.teacherName || 'unknown';
+  const created = parsed.createdAt ? new Date(parsed.createdAt).toLocaleString() : 'unknown';
+  return `
+    <div><strong>Backup details:</strong></div>
+    <div>• Created: ${escapeHtml(created)}</div>
+    <div>• Teacher: ${escapeHtml(teacher)}</div>
+    <div>• Classes: ${periodCount}</div>
+    <div>• Students: ${rosterCount}</div>
+    <div>• Pass records: ${passCount}</div>
+  `;
+}
+
+function backupImport() {
+  document.getElementById('backup-import-file').click();
+}
+
+document.getElementById('backup-import-file').addEventListener('change', async (e) => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (!file) return;
+  try {
+    const text = await file.text();
+    const parsed = JSON.parse(text);
+    if (!parsed || !parsed.state || !parsed.state.settings) {
+      toast('That doesn\'t look like a Hall Pass backup file');
+      return;
+    }
+    if (parsed.backupVersion && parsed.backupVersion > BACKUP_VERSION) {
+      toast('Backup is from a newer version — may not load correctly');
+    }
+    pendingRestore = parsed;
+    document.getElementById('restore-preview').innerHTML = previewBackup(parsed);
+    document.getElementById('overlay-restore-confirm').classList.add('active');
+  } catch (err) {
+    toast('Could not read backup: ' + err.message);
+  }
+});
+
+document.getElementById('restore-cancel').addEventListener('click', () => {
+  document.getElementById('overlay-restore-confirm').classList.remove('active');
+  pendingRestore = null;
+});
+
+document.getElementById('restore-confirm').addEventListener('click', async () => {
+  if (!pendingRestore) return;
+  // Auto-save pre-restore copy as safety net
+  await writeBackup('hallpass_pre-restore');
+  state = pendingRestore.state;
+  const defaults = loadState().settings;
+  state.settings = { ...defaults, ...state.settings };
+  saveState();
+  pendingRestore = null;
+  document.getElementById('overlay-restore-confirm').classList.remove('active');
+  toast('Data restored — pre-restore copy saved as safety net');
+  renderKiosk();
+  renderSetup();
+});
+
+document.getElementById('backup-export-btn').addEventListener('click', () => backupExport(false));
+document.getElementById('backup-import-btn').addEventListener('click', backupImport);
+document.getElementById('backup-now-btn').addEventListener('click', () => backupExport(false));
+document.getElementById('backup-dismiss-btn').addEventListener('click', () => {
+  state.settings.backupBannerDismissedUntil = new Date(Date.now() + 24 * 3600 * 1000).toISOString();
+  saveState();
+  updateBackupBanner();
+});
+document.getElementById('set-backup-folder-btn').addEventListener('click', pickBackupFolder);
+document.getElementById('clear-backup-folder-btn').addEventListener('click', clearBackupFolder);
+
+document.getElementById('auto-backup-toggle').addEventListener('change', (e) => {
+  state.settings.autoBackupEnabled = e.target.checked;
+  saveState();
+});
+document.getElementById('auto-backup-hour').addEventListener('change', (e) => {
+  const v = parseInt(e.target.value);
+  if (!isNaN(v) && v >= 0 && v <= 23) {
+    state.settings.autoBackupHour = v;
+    saveState();
+  }
+});
+
+function renderBackupStatus() {
+  const el = document.getElementById('backup-status');
+  const folderText = document.getElementById('backup-folder-text');
+  const setBtn = document.getElementById('set-backup-folder-btn');
+  const clearBtn = document.getElementById('clear-backup-folder-btn');
+  const autoToggle = document.getElementById('auto-backup-toggle');
+  const autoHour = document.getElementById('auto-backup-hour');
+
+  if (autoToggle) autoToggle.checked = state.settings.autoBackupEnabled !== false;
+  if (autoHour) autoHour.value = state.settings.autoBackupHour ?? 16;
+
+  // Folder section text
+  if (folderText) {
+    if (!FS_ACCESS_SUPPORTED) {
+      folderText.innerHTML = `<strong>This browser doesn't support folder picking.</strong> Backups will download to your Downloads folder. To get auto-sync, point your downloads at a OneDrive/Google Drive folder in your browser settings, or use Chrome/Edge on a desktop.`;
+      if (setBtn) setBtn.disabled = true;
+      if (clearBtn) clearBtn.style.display = 'none';
+    } else if (backupFolderHandle && state.settings.hasBackupFolder) {
+      folderText.innerHTML = `<strong>Backup folder:</strong> ${escapeHtml(backupFolderHandle.name)}<br><span style="color: var(--ink-3); font-size: 12px;">If this folder is inside OneDrive or Google Drive, backups will sync automatically.</span>`;
+      if (setBtn) { setBtn.textContent = 'Change folder'; setBtn.disabled = false; }
+      if (clearBtn) clearBtn.style.display = '';
+    } else {
+      folderText.innerHTML = `No backup folder set. Pick a folder inside your OneDrive or Google Drive — backups will save there directly.<br><span style="color: var(--ink-3); font-size: 12px;">Without a folder, backups download to your Downloads folder.</span>`;
+      if (setBtn) { setBtn.textContent = 'Pick backup folder'; setBtn.disabled = false; }
+      if (clearBtn) clearBtn.style.display = 'none';
+    }
+  }
+
+  // Last backup status
+  if (el) {
+    const last = state.settings.lastBackupAt;
+    if (!last) {
+      el.innerHTML = '<span style="color: var(--over);">⚠ No backup saved yet.</span> If anything happens to this device, your data will be lost.';
+    } else {
+      const lastDate = new Date(last);
+      const days = Math.floor((Date.now() - lastDate.getTime()) / (24 * 3600 * 1000));
+      let color = 'var(--ink-2)';
+      if (days >= 7) color = 'var(--over)';
+      else if (days >= 3) color = '#854f0b';
+      el.innerHTML = `<span style="color: ${color};">Last backup: ${lastDate.toLocaleString()}${days > 0 ? ` (${days} day${days > 1 ? 's' : ''} ago)` : ' (today)'}.</span>`;
+    }
+  }
+}
+
+function updateBackupBanner() {
+  const banner = document.getElementById('backup-banner');
+  const text = document.getElementById('backup-banner-text');
+  const hasData = state.passes.length > 0 || state.roster.length > 0;
+  if (!hasData) { banner.classList.remove('show'); return; }
+  if (state.settings.backupBannerDismissedUntil) {
+    if (new Date(state.settings.backupBannerDismissedUntil).getTime() > Date.now()) {
+      banner.classList.remove('show');
+      return;
+    }
+  }
+  const last = state.settings.lastBackupAt;
+  if (!last) {
+    text.textContent = 'No backup saved yet — pick a folder in Setup or click "Back up now".';
+    banner.classList.add('show');
+    return;
+  }
+  const days = Math.floor((Date.now() - new Date(last).getTime()) / (24 * 3600 * 1000));
+  if (days >= 7) {
+    text.textContent = `Last backup was ${days} days ago. Consider saving a fresh one.`;
+    banner.classList.add('show');
+  } else {
+    banner.classList.remove('show');
+  }
+}
+
+// Auto-backup scheduler — checks every minute whether it's time
+async function checkAutoBackup() {
+  if (!state.settings.autoBackupEnabled) return;
+  // Don't auto-backup if there's no data
+  if (state.passes.length === 0 && state.roster.length === 0) return;
+  const today = new Date().toDateString();
+  if (state.settings.lastAutoBackupDate === today) return;
+  const now = new Date();
+  const hour = state.settings.autoBackupHour ?? 16;
+  // Only trigger when current hour >= configured hour (so if app starts at 5pm, it still backs up)
+  if (now.getHours() < hour) return;
+  // It's time
+  try {
+    await backupExport(true);
+  } catch (err) {
+    console.error('Auto-backup failed:', err);
+  }
+}
+
+setInterval(checkAutoBackup, 60 * 1000); // check every minute
+
+// ============ INSTALL (PWA) ============
+let deferredInstallPrompt = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  deferredInstallPrompt = e;
+  showInstallBanner();
+});
+
+window.addEventListener('appinstalled', () => {
+  deferredInstallPrompt = null;
+  document.getElementById('install-banner').classList.remove('show');
+  toast('App installed');
+});
+
+function detectPlatform() {
+  const ua = navigator.userAgent.toLowerCase();
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+  if (isStandalone) return 'installed';
+  if (/iphone|ipad|ipod/.test(ua)) return 'ios';
+  if (/android/.test(ua)) return 'android';
+  if (/edg/.test(ua)) return 'edge';
+  if (/chrome/.test(ua)) return 'chrome';
+  if (/firefox/.test(ua)) return 'firefox';
+  if (/safari/.test(ua)) return 'safari-desktop';
+  return 'unknown';
+}
+
+function showInstallBanner() {
+  const banner = document.getElementById('install-banner');
+  const text = document.getElementById('install-banner-text');
+  const btn = document.getElementById('install-prompt-btn');
+  const platform = detectPlatform();
+
+  if (platform === 'installed') { banner.classList.remove('show'); return; }
+
+  // Don't show if dismissed in last 14 days
+  const dismissedAt = state.settings.installBannerDismissedAt;
+  if (dismissedAt) {
+    const days = (Date.now() - new Date(dismissedAt).getTime()) / (24 * 3600 * 1000);
+    if (days < 14) { banner.classList.remove('show'); return; }
+  }
+
+  if (deferredInstallPrompt) {
+    text.textContent = 'Install this as an app for offline use and faster access.';
+    btn.style.display = '';
+    banner.classList.add('show');
+  } else if (platform === 'ios') {
+    text.textContent = 'iPad/iPhone: tap the Share button below, then "Add to Home Screen" to install.';
+    btn.style.display = 'none';
+    banner.classList.add('show');
+  } else if (platform === 'safari-desktop') {
+    text.textContent = 'Safari doesn\'t fully support installing this. Try Chrome or Edge.';
+    btn.style.display = 'none';
+    banner.classList.add('show');
+  }
+  // Other platforms: rely on the beforeinstallprompt event (banner stays hidden until that fires)
+}
+
+document.getElementById('install-prompt-btn').addEventListener('click', async () => {
+  if (deferredInstallPrompt) {
+    deferredInstallPrompt.prompt();
+    const choice = await deferredInstallPrompt.userChoice;
+    if (choice.outcome === 'accepted') {
+      document.getElementById('install-banner').classList.remove('show');
+    }
+    deferredInstallPrompt = null;
+  } else {
+    showInstallInstructions();
+  }
+});
+
+document.getElementById('install-dismiss-btn').addEventListener('click', () => {
+  state.settings.installBannerDismissedAt = nowIso();
+  saveState();
+  document.getElementById('install-banner').classList.remove('show');
+});
+
+document.getElementById('install-show-btn').addEventListener('click', showInstallInstructions);
+document.getElementById('install-modal-close').addEventListener('click', () => {
+  document.getElementById('overlay-install').classList.remove('active');
+});
+
+function showInstallInstructions() {
+  const platform = detectPlatform();
+  const sub = document.getElementById('install-sub');
+  const stepsEl = document.getElementById('install-steps');
+
+  let title = '', steps = [];
+  if (platform === 'installed') {
+    sub.textContent = "You're already running the installed app.";
+    steps = [];
+  } else if (platform === 'ios') {
+    sub.textContent = 'iPad/iPhone (Safari)';
+    steps = [
+      'Tap the Share button (square with up arrow) at the bottom of the screen',
+      'Scroll down and tap "Add to Home Screen"',
+      'Tap "Add" in the top right',
+      "The app will appear on your home screen with its own icon"
+    ];
+  } else if (platform === 'chrome' || platform === 'edge' || platform === 'android') {
+    sub.textContent = platform === 'android' ? 'Android (Chrome)' : (platform === 'edge' ? 'Edge desktop' : 'Chrome desktop');
+    steps = [
+      'Click the install icon in the address bar (looks like a small monitor or download arrow)',
+      'Or, click the menu (⋮) and pick "Install Hall Pass" or "Install app"',
+      'The app gets its own desktop icon and opens in its own window'
+    ];
+  } else if (platform === 'firefox') {
+    sub.textContent = 'Firefox';
+    steps = [
+      "Firefox doesn't support installing this app the same way as Chrome",
+      'Bookmark this page and pin the tab — that gives you fast access',
+      'Or, switch to Chrome or Edge to install it as a real app'
+    ];
+  } else {
+    sub.textContent = 'Other browser';
+    steps = [
+      'Look for "Install app" or "Add to Home Screen" in your browser menu',
+      'If your browser doesn\'t support that, bookmark this page'
+    ];
+  }
+
+  stepsEl.innerHTML = steps.map((s, i) => `
+    <div class="install-step">
+      <div class="num">${i + 1}</div>
+      <div>${escapeHtml(s)}</div>
+    </div>
+  `).join('') || '<div style="color: var(--ink-3); text-align: center; padding: 16px;">No install steps needed.</div>';
+
+  document.getElementById('overlay-install').classList.add('active');
+}
+
+// ============ SERVICE WORKER ============
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').catch(err => {
+      // Fail silently — works fine without offline support
+      console.log('Service worker registration skipped:', err.message);
+    });
+  });
+}
+
+// ============ INIT ============
+checkQuarterReset();
+renderKiosk();
+document.getElementById('kiosk-clock').textContent = new Date().toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+updateBackupBanner();
+showInstallBanner();
+
+// Restore backup folder handle if previously selected
+(async () => {
+  if (!FS_ACCESS_SUPPORTED) return;
+  try {
+    const handle = await idbGet('backupFolder');
+    if (handle) {
+      // Don't request permission yet — wait until user actually saves a backup or opens setup
+      backupFolderHandle = handle;
+      // Refresh UI if setup is currently visible
+      if (document.getElementById('panel-setup').classList.contains('active')) {
+        renderBackupStatus();
+      }
+    }
+  } catch (err) {
+    console.log('Could not restore backup folder:', err.message);
+  }
+})();
+
+// Run a single auto-backup check at startup (in case it's already past 4pm and we haven't backed up today)
+setTimeout(checkAutoBackup, 5000);
+
+if (state.periods.length === 0 && !state.settings.teacherName) {
+  document.querySelector('[data-tab="setup"]').click();
+}
+</script>
+</body>
+</html>
