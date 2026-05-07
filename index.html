@@ -14,7 +14,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <style>
   :root {
@@ -277,16 +276,6 @@
     letter-spacing: -0.01em;
   }
   .modal .sub { color: var(--ink-2); font-size: 14px; margin-bottom: 24px; }
-
-  #qr-reader { width: 100%; border-radius: var(--radius); overflow: hidden; }
-  #qr-reader video { width: 100% !important; height: auto !important; }
-  .camera-timer {
-    text-align: center;
-    margin-top: 12px;
-    font-size: 13px;
-    color: var(--ink-2);
-    font-variant-numeric: tabular-nums;
-  }
 
   .student-card {
     display: flex;
@@ -953,6 +942,16 @@
         </div>
 
         <div class="setup-card">
+          <h3>Teacher PIN</h3>
+          <p class="help">A 4-digit PIN required to delete pass records. Without it, anyone with access to the device could erase records. PIN travels with backup files, so restoring on another device keeps the same PIN.</p>
+          <div id="pin-status" style="font-size: 13px; color: var(--ink-2); margin-bottom: 12px;"></div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button id="pin-manage-btn">Set / change PIN</button>
+            <button id="pin-clear-btn" style="display: none; color: var(--over);">Clear PIN</button>
+          </div>
+        </div>
+
+        <div class="setup-card">
           <h3>Install as app</h3>
           <p class="help">Install Hall Pass as an app on this device. Gets its own icon, opens in its own window, and works without an internet connection.</p>
           <div style="display: flex; gap: 8px;">
@@ -981,24 +980,11 @@
 </div>
 
 <!-- OVERLAYS -->
-<div class="overlay" id="overlay-camera">
-  <div class="modal">
-    <h2>Scan your ID</h2>
-    <p class="sub">Hold the barcode steady in front of the camera.</p>
-    <div id="qr-reader"></div>
-    <div class="camera-timer" id="camera-timer">Camera closes in 10s</div>
-    <div style="display: flex; gap: 8px; margin-top: 16px;">
-      <button id="cam-cancel" style="flex: 1;">Cancel</button>
-      <button id="cam-manual" style="flex: 1;">Type ID instead</button>
-    </div>
-  </div>
-</div>
-
 <div class="overlay" id="overlay-manual">
   <div class="modal">
-    <h2>Type your student ID</h2>
-    <p class="sub">Enter the number printed on your ID.</p>
-    <input type="text" id="manual-id" inputmode="numeric" placeholder="Student ID" style="width: 100%; font-size: 18px; text-align: center; letter-spacing: 0.1em; padding: 14px;" autocomplete="off">
+    <h2>Enter your student ID</h2>
+    <p class="sub">Type the number printed on your school ID.</p>
+    <input type="text" id="manual-id" inputmode="numeric" pattern="[0-9]*" placeholder="Student ID" style="width: 100%; font-size: 22px; text-align: center; letter-spacing: 0.15em; padding: 18px;" autocomplete="off">
     <div style="display: flex; gap: 8px; margin-top: 16px;">
       <button id="manual-cancel" style="flex: 1;">Cancel</button>
       <button class="primary" id="manual-submit" style="flex: 1;">Continue</button>
@@ -1095,6 +1081,50 @@
   </div>
 </div>
 
+<div class="overlay" id="overlay-pin-setup">
+  <div class="modal">
+    <h2 id="pin-setup-title">Set your teacher PIN</h2>
+    <p class="sub" id="pin-setup-sub">Pick a 4-digit PIN. You'll enter it before deleting any pass record. Stored only on this device (and in your backup file).</p>
+    <div style="margin-bottom: 12px;">
+      <label style="display: block; font-size: 13px; color: var(--ink-2); margin-bottom: 4px;">PIN (4 digits)</label>
+      <input type="password" id="pin-setup-pin" inputmode="numeric" maxlength="4" pattern="[0-9]*" autocomplete="off" style="width: 100%; font-size: 18px; text-align: center; letter-spacing: 0.3em; padding: 14px;">
+    </div>
+    <div style="margin-bottom: 16px;">
+      <label style="display: block; font-size: 13px; color: var(--ink-2); margin-bottom: 4px;">Confirm PIN</label>
+      <input type="password" id="pin-setup-confirm" inputmode="numeric" maxlength="4" pattern="[0-9]*" autocomplete="off" style="width: 100%; font-size: 18px; text-align: center; letter-spacing: 0.3em; padding: 14px;">
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button id="pin-setup-cancel" style="flex: 1;">Cancel</button>
+      <button class="primary" id="pin-setup-save" style="flex: 1;">Set PIN</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-pin-enter">
+  <div class="modal">
+    <h2>Enter teacher PIN</h2>
+    <p class="sub" id="pin-enter-sub">Required to delete this pass record.</p>
+    <input type="password" id="pin-enter-pin" inputmode="numeric" maxlength="4" pattern="[0-9]*" autocomplete="off" style="width: 100%; font-size: 22px; text-align: center; letter-spacing: 0.3em; padding: 14px; margin-bottom: 16px;">
+    <div id="pin-enter-error" style="color: var(--over); font-size: 13px; margin-bottom: 12px; display: none;"></div>
+    <div style="display: flex; gap: 8px;">
+      <button id="pin-enter-cancel" style="flex: 1;">Cancel</button>
+      <button class="primary" id="pin-enter-submit" style="flex: 1;">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-delete-pass">
+  <div class="modal">
+    <h2>Delete this pass?</h2>
+    <p class="sub" id="delete-pass-sub">This pass record will be removed entirely. If it was a bathroom pass, the count will be refunded.</p>
+    <div id="delete-pass-info" style="background: var(--surface-2); border-radius: var(--radius); padding: 12px 14px; font-size: 13px; margin-bottom: 16px; line-height: 1.6;"></div>
+    <div style="display: flex; gap: 8px;">
+      <button id="delete-pass-cancel" style="flex: 1;">Cancel</button>
+      <button class="primary" id="delete-pass-confirm" style="flex: 1; background: var(--over); border-color: var(--over);">Delete pass</button>
+    </div>
+  </div>
+</div>
+
 <script>
 // ============ KELLER ISD CALENDAR ============
 const KELLER_QUARTERS = [
@@ -1120,10 +1150,7 @@ function getCurrentKellerQuarter(refDate) {
 // ============ STATE ============
 const STORAGE_KEY = 'hallpass_v3';
 let state = loadState();
-let html5QrCode = null;
-let cameraTimeoutId = null;
-let cameraCountdownId = null;
-let pendingScan = null; // { rawId } when an unknown ID was scanned
+let pendingScan = null; // populated when an unknown ID was entered
 
 function loadState() {
   try {
@@ -1148,7 +1175,9 @@ function loadState() {
       autoBackupHour: 16,
       hasBackupFolder: false,
       installBannerDismissedAt: null,
-      backupBannerDismissedUntil: null
+      backupBannerDismissedUntil: null,
+      pinHash: null,
+      pinSalt: null
     },
     activePeriodId: null, // legacy, kept for migration only — no longer used in flow
     periods: [], // { id, name }
@@ -1213,15 +1242,49 @@ function checkQuarterReset() {
 }
 
 // ============ TABS ============
+// Non-kiosk tabs are PIN-gated. After successful PIN entry, free access lasts 30s.
+// Returning to Kiosk resets the window so any subsequent non-kiosk navigation re-prompts.
+const TEACHER_TABS = ['dash', 'search', 'setup'];
+const TEACHER_UNLOCK_MS = 30 * 1000;
+let teacherUnlockedUntil = 0;
+
+function teacherAreaUnlocked() {
+  return Date.now() < teacherUnlockedUntil;
+}
+
+function activateTab(tab) {
+  document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === `panel-${tab}`));
+  if (tab === 'kiosk') {
+    teacherUnlockedUntil = 0; // re-lock when returning to Kiosk
+    renderKiosk();
+  } else if (tab === 'dash') {
+    teacherUnlockedUntil = Date.now() + TEACHER_UNLOCK_MS;
+    renderDash();
+  } else if (tab === 'search') {
+    teacherUnlockedUntil = Date.now() + TEACHER_UNLOCK_MS;
+    renderSearch();
+  } else if (tab === 'setup') {
+    teacherUnlockedUntil = Date.now() + TEACHER_UNLOCK_MS;
+    renderSetup();
+  }
+}
+
 document.querySelectorAll('.tab').forEach(btn => {
-  btn.addEventListener('click', () => {
+  btn.addEventListener('click', async () => {
     const tab = btn.dataset.tab;
-    document.querySelectorAll('.tab').forEach(b => b.classList.toggle('active', b === btn));
-    document.querySelectorAll('.panel').forEach(p => p.classList.toggle('active', p.id === `panel-${tab}`));
-    if (tab === 'kiosk') renderKiosk();
-    if (tab === 'dash') renderDash();
-    if (tab === 'search') renderSearch();
-    if (tab === 'setup') renderSetup();
+    // Kiosk tab: always free
+    if (tab === 'kiosk') { activateTab(tab); return; }
+    // Other tabs: PIN-gated, with rolling 30s window
+    if (TEACHER_TABS.includes(tab)) {
+      if (teacherAreaUnlocked()) {
+        activateTab(tab);
+        return;
+      }
+      const ok = await requestPin('Enter teacher PIN to access this tab.');
+      if (!ok) return;
+      activateTab(tab);
+    }
   });
 });
 
@@ -1253,8 +1316,7 @@ function renderKiosk() {
         <div>Tap below when you're ready to leave</div>
       </div>
       <div class="scan-cta">
-        <button id="kiosk-scan">Scan ID</button>
-        <button class="secondary" id="kiosk-type">Type ID</button>
+        <button id="kiosk-type">Enter Student ID</button>
       </div>
     `;
   } else {
@@ -1278,16 +1340,13 @@ function renderKiosk() {
     html += '</div>';
     html += `
       <div class="scan-cta">
-        <button id="kiosk-scan">Scan ID</button>
-        <button class="secondary" id="kiosk-type">Type ID</button>
+        <button id="kiosk-type">Enter Student ID</button>
       </div>
     `;
     screen.innerHTML = html;
   }
 
-  const scanBtn = document.getElementById('kiosk-scan');
   const typeBtn = document.getElementById('kiosk-type');
-  if (scanBtn) scanBtn.addEventListener('click', openCamera);
   if (typeBtn) typeBtn.addEventListener('click', openManual);
 }
 
@@ -1315,52 +1374,6 @@ setInterval(() => {
   }
   if (document.getElementById('panel-dash').classList.contains('active')) renderDashLive();
 }, 1000);
-
-// ============ CAMERA ============
-function openCamera() {
-  document.getElementById('overlay-camera').classList.add('active');
-  startCamera();
-  startCameraTimer();
-}
-function closeCamera() {
-  if (html5QrCode && html5QrCode.isScanning) html5QrCode.stop().catch(() => {});
-  if (cameraTimeoutId) { clearTimeout(cameraTimeoutId); cameraTimeoutId = null; }
-  if (cameraCountdownId) { clearInterval(cameraCountdownId); cameraCountdownId = null; }
-  document.getElementById('overlay-camera').classList.remove('active');
-}
-function startCamera() {
-  if (!html5QrCode) html5QrCode = new Html5Qrcode('qr-reader');
-  html5QrCode.start(
-    { facingMode: 'environment' },
-    { fps: 10, qrbox: { width: 280, height: 140 } },
-    (decodedText) => { onIdEntered(decodedText.trim()); closeCamera(); },
-    () => {}
-  ).catch(() => {
-    html5QrCode.start(
-      { facingMode: 'user' },
-      { fps: 10, qrbox: { width: 280, height: 140 } },
-      (decodedText) => { onIdEntered(decodedText.trim()); closeCamera(); },
-      () => {}
-    ).catch(() => {
-      toast('Camera unavailable. Type your ID instead.');
-      closeCamera();
-      openManual();
-    });
-  });
-}
-function startCameraTimer() {
-  let remaining = 10;
-  const el = document.getElementById('camera-timer');
-  el.textContent = `Camera closes in ${remaining}s`;
-  cameraCountdownId = setInterval(() => {
-    remaining--;
-    el.textContent = `Camera closes in ${remaining}s`;
-    if (remaining <= 0) clearInterval(cameraCountdownId);
-  }, 1000);
-  cameraTimeoutId = setTimeout(() => closeCamera(), 10000);
-}
-document.getElementById('cam-cancel').addEventListener('click', closeCamera);
-document.getElementById('cam-manual').addEventListener('click', () => { closeCamera(); openManual(); });
 
 // ============ MANUAL ============
 function openManual() {
@@ -1478,19 +1491,16 @@ function openConfirmDestination(student) {
     <div class="dest-grid">
       <button class="dest-btn" data-dest="Bathroom" ${blockedFromBathroom ? 'disabled' : ''}>
         <div class="name">Bathroom</div>
-        <div class="meta">${blockedFromBathroom ? 'Out of passes — see teacher' : (accommodated ? "Doesn't count" : `${remaining} left this quarter`)}</div>
+        <div class="meta">${blockedFromBathroom ? 'Out of passes — see teacher' : (accommodated ? '' : `${remaining} left this quarter`)}</div>
       </button>
       <button class="dest-btn" data-dest="Asking another teacher">
         <div class="name">Ask another teacher</div>
-        <div class="meta">Doesn't count toward bathroom limit</div>
       </button>
       <button class="dest-btn" data-dest="Nurse">
         <div class="name">Nurse</div>
-        <div class="meta">Doesn't count</div>
       </button>
       <button class="dest-btn" data-dest="Office / counselor">
         <div class="name">Office or counselor</div>
-        <div class="meta">Doesn't count</div>
       </button>
     </div>
     <button id="confirm-cancel" style="width: 100%;">Cancel</button>
@@ -1716,6 +1726,7 @@ function renderDash() {
           </div>
           <div class="timer tabular ${cls === 'ok' ? '' : cls}" data-live-pass="${p.id}">${fmtDuration(sec)}</div>
           <button class="ghost" data-mark-return="${p.id}">Mark returned</button>
+          <button class="ghost icon-btn" data-delete-pass="${p.id}" title="Delete pass" style="font-size: 16px; padding: 4px 10px; line-height: 1; color: var(--ink-3);">×</button>
         </div>
       `;
     });
@@ -1755,6 +1766,12 @@ function renderDash() {
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       markReturned(btn.dataset.markReturn);
+    });
+  });
+  document.querySelectorAll('[data-delete-pass]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      requestDeletePass(btn.dataset.deletePass, () => renderDash());
     });
   });
   document.querySelectorAll('[data-student-detail]').forEach(row => {
@@ -1921,7 +1938,7 @@ function openStudentDetail(studentId) {
   if (allPasses.length === 0) {
     html += '<div style="text-align: center; color: var(--ink-3); padding: 24px;">No passes yet.</div>';
   } else {
-    html += '<table class="log"><thead><tr><th>Date</th><th>Destination</th><th class="right">Length</th><th class="right">Status</th></tr></thead><tbody>';
+    html += '<table class="log"><thead><tr><th>Date</th><th>Destination</th><th class="right">Length</th><th class="right">Status</th><th class="right" style="width: 36px;"></th></tr></thead><tbody>';
     allPasses.slice(0, 30).forEach(p => {
       const isOut = !p.signInAt;
       const sec = passDurationSec(p);
@@ -1939,6 +1956,7 @@ function openStudentDetail(studentId) {
           <td style="color: var(--ink-2);">${escapeHtml(p.destination)}</td>
           <td class="right tabular">${fmtDuration(sec)}</td>
           <td class="right"><span class="pill ${pillCls}">${pillText}</span></td>
+          <td class="right"><button class="ghost icon-btn" data-delete-pass="${escapeHtml(p.id)}" title="Delete pass" style="font-size: 16px; padding: 2px 8px; line-height: 1;">×</button></td>
         </tr>
       `;
     });
@@ -1968,6 +1986,14 @@ function openStudentDetail(studentId) {
   });
   document.getElementById('detail-change-class').addEventListener('click', () => {
     openChangeClass(student);
+  });
+  // Wire up delete-pass buttons
+  document.querySelectorAll('[data-delete-pass]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const passId = btn.dataset.deletePass;
+      requestDeletePass(passId, () => openStudentDetail(studentId));
+    });
   });
 }
 
@@ -2044,6 +2070,7 @@ function renderSetup() {
   document.getElementById('quarter-end').value = state.settings.manualQuarterEnd || '';
   document.getElementById('manual-quarter-fields').style.display = state.settings.useKellerCalendar ? 'none' : 'block';
   renderBackupStatus();
+  renderPinStatus();
 
   const q = getActiveQuarter();
   const qInfo = document.getElementById('quarter-info');
@@ -2107,7 +2134,8 @@ function renderSetup() {
 }
 
 function viewPeriodStudents(periodId) {
-  document.querySelector('[data-tab="search"]').click();
+  // User is already in the teacher area, bypass PIN by calling activateTab directly
+  activateTab('search');
   document.getElementById('search-input').value = '';
   const period = getPeriod(periodId);
   const list = state.roster.filter(s => s.periodId === periodId);
@@ -2880,6 +2908,235 @@ async function checkAutoBackup() {
 
 setInterval(checkAutoBackup, 60 * 1000); // check every minute
 
+// ============ TEACHER PIN ============
+// Hash the PIN with a salt using SubtleCrypto. Stored as hex strings.
+async function hashPin(pin, salt) {
+  const enc = new TextEncoder();
+  const data = enc.encode(salt + ':' + pin);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function genSalt() {
+  const arr = new Uint8Array(16);
+  crypto.getRandomValues(arr);
+  return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+function hasPin() {
+  return !!(state.settings.pinHash && state.settings.pinSalt);
+}
+
+async function verifyPin(pin) {
+  if (!hasPin()) return false;
+  const candidate = await hashPin(pin, state.settings.pinSalt);
+  return candidate === state.settings.pinHash;
+}
+
+async function setPin(pin) {
+  const salt = genSalt();
+  const hash = await hashPin(pin, salt);
+  state.settings.pinSalt = salt;
+  state.settings.pinHash = hash;
+  saveState();
+}
+
+function clearPin() {
+  state.settings.pinSalt = null;
+  state.settings.pinHash = null;
+  saveState();
+}
+
+// PIN setup modal — used both for first-time and for changing
+let pinSetupResolver = null;
+function openPinSetup(isChange) {
+  return new Promise((resolve) => {
+    pinSetupResolver = resolve;
+    const overlay = document.getElementById('overlay-pin-setup');
+    const title = document.getElementById('pin-setup-title');
+    const sub = document.getElementById('pin-setup-sub');
+    title.textContent = isChange ? 'Change your PIN' : 'Set your teacher PIN';
+    sub.textContent = isChange
+      ? 'Pick a new 4-digit PIN. Old PIN will stop working.'
+      : 'Pick a 4-digit PIN. You\'ll enter it before deleting any pass record. Stored only on this device (and in your backup file).';
+    document.getElementById('pin-setup-pin').value = '';
+    document.getElementById('pin-setup-confirm').value = '';
+    overlay.classList.add('active');
+    setTimeout(() => document.getElementById('pin-setup-pin').focus(), 50);
+  });
+}
+
+document.getElementById('pin-setup-cancel').addEventListener('click', () => {
+  document.getElementById('overlay-pin-setup').classList.remove('active');
+  if (pinSetupResolver) { pinSetupResolver(false); pinSetupResolver = null; }
+});
+
+document.getElementById('pin-setup-save').addEventListener('click', async () => {
+  const pin = document.getElementById('pin-setup-pin').value.trim();
+  const confirm = document.getElementById('pin-setup-confirm').value.trim();
+  if (!/^\d{4}$/.test(pin)) { toast('PIN must be 4 digits'); return; }
+  if (pin !== confirm) { toast('PINs don\'t match'); return; }
+  await setPin(pin);
+  document.getElementById('overlay-pin-setup').classList.remove('active');
+  toast('PIN saved');
+  renderPinStatus();
+  if (pinSetupResolver) { pinSetupResolver(true); pinSetupResolver = null; }
+});
+
+// Auto-advance from PIN to confirm field
+document.getElementById('pin-setup-pin').addEventListener('input', (e) => {
+  if (e.target.value.length === 4) document.getElementById('pin-setup-confirm').focus();
+});
+document.getElementById('pin-setup-confirm').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('pin-setup-save').click();
+});
+
+// PIN entry modal — used to verify before privileged action
+let pinEnterResolver = null;
+function requestPin(reason) {
+  return new Promise(async (resolve) => {
+    if (!hasPin()) {
+      // First time — set up a PIN before the privileged action
+      const ok = await openPinSetup(false);
+      resolve(ok);
+      return;
+    }
+    pinEnterResolver = resolve;
+    const overlay = document.getElementById('overlay-pin-enter');
+    document.getElementById('pin-enter-sub').textContent = reason || 'Required to continue.';
+    document.getElementById('pin-enter-pin').value = '';
+    document.getElementById('pin-enter-error').style.display = 'none';
+    overlay.classList.add('active');
+    setTimeout(() => document.getElementById('pin-enter-pin').focus(), 50);
+  });
+}
+
+document.getElementById('pin-enter-cancel').addEventListener('click', () => {
+  document.getElementById('overlay-pin-enter').classList.remove('active');
+  if (pinEnterResolver) { pinEnterResolver(false); pinEnterResolver = null; }
+});
+
+document.getElementById('pin-enter-submit').addEventListener('click', async () => {
+  const pin = document.getElementById('pin-enter-pin').value.trim();
+  const ok = await verifyPin(pin);
+  if (ok) {
+    document.getElementById('overlay-pin-enter').classList.remove('active');
+    if (pinEnterResolver) { pinEnterResolver(true); pinEnterResolver = null; }
+  } else {
+    const err = document.getElementById('pin-enter-error');
+    err.textContent = 'Wrong PIN. Try again.';
+    err.style.display = '';
+    document.getElementById('pin-enter-pin').value = '';
+    document.getElementById('pin-enter-pin').focus();
+  }
+});
+
+// Auto-submit when 4 digits entered
+document.getElementById('pin-enter-pin').addEventListener('input', (e) => {
+  if (e.target.value.length === 4) {
+    document.getElementById('pin-enter-submit').click();
+  }
+});
+document.getElementById('pin-enter-pin').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('pin-enter-submit').click();
+});
+
+document.getElementById('pin-manage-btn').addEventListener('click', async () => {
+  if (!hasPin()) {
+    await openPinSetup(false);
+    return;
+  }
+  // Changing requires verifying old PIN first
+  const ok = await requestPin('Enter current PIN to change it.');
+  if (ok) await openPinSetup(true);
+});
+
+document.getElementById('pin-clear-btn').addEventListener('click', async () => {
+  if (!hasPin()) return;
+  const ok = await requestPin('Enter current PIN to remove it.');
+  if (!ok) return;
+  if (!confirm('Remove the PIN? Anyone with access to this device will be able to delete pass records without verification.')) return;
+  clearPin();
+  toast('PIN removed');
+  renderPinStatus();
+});
+
+function renderPinStatus() {
+  const el = document.getElementById('pin-status');
+  const manageBtn = document.getElementById('pin-manage-btn');
+  const clearBtn = document.getElementById('pin-clear-btn');
+  if (!el) return;
+  if (hasPin()) {
+    el.innerHTML = '<span style="color: var(--ok);">✓ PIN is set.</span>';
+    if (manageBtn) manageBtn.textContent = 'Change PIN';
+    if (clearBtn) clearBtn.style.display = '';
+  } else {
+    el.innerHTML = '<span style="color: var(--ink-3);">No PIN set yet. You\'ll be prompted to create one the first time you delete a pass.</span>';
+    if (manageBtn) manageBtn.textContent = 'Set PIN';
+    if (clearBtn) clearBtn.style.display = 'none';
+  }
+}
+
+// ============ DELETE PASS ============
+let pendingDeletePass = null;
+let pendingDeleteRefresh = null;
+
+function requestDeletePass(passId, refreshFn) {
+  const pass = state.passes.find(p => p.id === passId);
+  if (!pass) return;
+  pendingDeletePass = pass;
+  pendingDeleteRefresh = refreshFn;
+  const isOut = !pass.signInAt;
+  const sec = passDurationSec(pass);
+  const period = getPeriod(pass.periodId);
+  const dateStr = fmtDate(pass.signOutAt) + ' ' + fmtTime(pass.signOutAt);
+  const wouldRefund = pass.destination === 'Bathroom' && !state.roster.find(s => s.id === pass.studentId)?.accommodation;
+  document.getElementById('delete-pass-info').innerHTML = `
+    <div><strong>${escapeHtml(pass.studentName)}</strong></div>
+    <div>${escapeHtml(pass.destination)}${period ? ' · ' + escapeHtml(period.name) : ''}</div>
+    <div>${dateStr} · ${isOut ? 'still out (' + fmtDuration(sec) + ')' : fmtDuration(sec)}</div>
+    ${wouldRefund ? '<div style="margin-top: 6px; color: var(--ok);">Bathroom count will be refunded.</div>' : ''}
+  `;
+  document.getElementById('overlay-delete-pass').classList.add('active');
+}
+
+document.getElementById('delete-pass-cancel').addEventListener('click', () => {
+  document.getElementById('overlay-delete-pass').classList.remove('active');
+  pendingDeletePass = null;
+  pendingDeleteRefresh = null;
+});
+
+document.getElementById('delete-pass-confirm').addEventListener('click', async () => {
+  if (!pendingDeletePass) return;
+  document.getElementById('overlay-delete-pass').classList.remove('active');
+  const ok = await requestPin('Required to delete this pass.');
+  if (!ok) {
+    pendingDeletePass = null;
+    pendingDeleteRefresh = null;
+    return;
+  }
+  // Verified — actually delete
+  const pass = pendingDeletePass;
+  const refreshFn = pendingDeleteRefresh;
+  const studentId = pass.studentId;
+  const isBathroomPass = pass.destination === 'Bathroom';
+  const student = state.roster.find(s => s.id === studentId);
+  const shouldRefund = isBathroomPass && student && !student.accommodation;
+
+  // Remove the pass
+  state.passes = state.passes.filter(p => p.id !== pass.id);
+  // Refund bathroom count if applicable
+  if (shouldRefund && state.quarterCounts[studentId] > 0) {
+    state.quarterCounts[studentId] -= 1;
+  }
+  saveState();
+  toast(`Pass deleted${shouldRefund ? ' · bathroom count refunded' : ''}`);
+  pendingDeletePass = null;
+  pendingDeleteRefresh = null;
+  renderKiosk();
+  if (refreshFn) refreshFn();
+});
+
 // ============ INSTALL (PWA) ============
 let deferredInstallPrompt = null;
 
@@ -3051,7 +3308,8 @@ showInstallBanner();
 setTimeout(checkAutoBackup, 5000);
 
 if (state.periods.length === 0 && !state.settings.teacherName) {
-  document.querySelector('[data-tab="setup"]').click();
+  // First-run setup — no data exists yet, no PIN exists yet, just go directly
+  activateTab('setup');
 }
 </script>
 </body>
