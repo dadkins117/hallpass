@@ -1,7 +1,7 @@
 // Hall Pass service worker
 // Caches the app shell so the app works offline after first load.
 
-const CACHE_VERSION = 'hallpass-v12-2026-08-11';
+const CACHE_VERSION = 'hallpass-v13-2026-09-01';
 const APP_SHELL = [
   './',
   './index.html',
