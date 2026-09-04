@@ -855,6 +855,16 @@
           </div>
 
           <div id="import-preview" style="display: none;"></div>
+
+          <div style="margin-top: 20px; padding-top: 16px; border-top: 0.5px solid var(--line);">
+            <div style="font-size: 14px; font-weight: 500; margin-bottom: 4px;">Sync from Aeries</div>
+            <div style="font-size: 12px; color: var(--ink-2); margin-bottom: 10px;">Already have a roster loaded? Upload a fresh Aeries file to add new students, update class periods for existing students, and optionally remove students no longer in the file. Pass history is preserved.</div>
+            <div class="file-drop" id="file-drop-resync" style="padding: 14px;">
+              <input type="file" id="csv-file-resync" accept=".csv,.xlsx,.xls,text/csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel">
+              <div class="drop-text" style="font-size: 13px;">Upload updated Aeries roster</div>
+              <div class="drop-help">Preview changes before applying</div>
+            </div>
+          </div>
         </div>
 
         <div class="setup-card">
@@ -1145,6 +1155,56 @@
     <div style="display: flex; gap: 8px;">
       <button id="edit-return-cancel" style="flex: 1;">Cancel</button>
       <button class="primary" id="edit-return-save" style="flex: 1;">Save</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-remove-student">
+  <div class="modal">
+    <h2>Remove student?</h2>
+    <p class="sub">This removes the student from your roster. Choose whether to keep their pass history.</p>
+    <div id="remove-student-info" style="background: var(--surface-2); border-radius: var(--radius); padding: 12px 14px; font-size: 13px; margin-bottom: 16px; line-height: 1.6;"></div>
+    <div style="margin-bottom: 16px;">
+      <label style="display: flex; gap: 10px; align-items: flex-start; padding: 10px; border: 0.5px solid var(--line-strong); border-radius: var(--radius); cursor: pointer; margin-bottom: 8px;">
+        <input type="radio" name="remove-mode" value="keep" checked style="margin-top: 3px;">
+        <div>
+          <div style="font-weight: 500;">Keep pass history</div>
+          <div style="font-size: 12px; color: var(--ink-2); margin-top: 2px;">Student vanishes from roster and Search, but their past passes stay in the record (still appear in CSV exports).</div>
+        </div>
+      </label>
+      <label style="display: flex; gap: 10px; align-items: flex-start; padding: 10px; border: 0.5px solid var(--line-strong); border-radius: var(--radius); cursor: pointer;">
+        <input type="radio" name="remove-mode" value="wipe" style="margin-top: 3px;">
+        <div>
+          <div style="font-weight: 500; color: var(--over);">Delete history too</div>
+          <div style="font-size: 12px; color: var(--ink-2); margin-top: 2px;">Erase all record of this student including every pass. Use for kids who were never actually in your class.</div>
+        </div>
+      </label>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button id="remove-student-cancel" style="flex: 1;">Cancel</button>
+      <button class="primary" id="remove-student-confirm" style="flex: 1; background: var(--over); border-color: var(--over);">Remove student</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="overlay-resync">
+  <div class="modal" style="max-width: 640px;">
+    <h2>Sync roster from Aeries</h2>
+    <p class="sub">Review changes before applying. Nothing is committed until you confirm.</p>
+    <div id="resync-summary" style="background: var(--surface-2); border-radius: var(--radius); padding: 12px 14px; font-size: 13px; margin-bottom: 12px; line-height: 1.6;"></div>
+    <div id="resync-details" style="max-height: 360px; overflow-y: auto; margin-bottom: 12px;"></div>
+    <div id="resync-remove-toggle" style="margin-bottom: 16px; display: none;">
+      <label style="display: flex; gap: 10px; align-items: flex-start; padding: 10px; border: 0.5px solid var(--line-strong); border-radius: var(--radius); cursor: pointer;">
+        <input type="checkbox" id="resync-remove-checkbox" style="margin-top: 3px;">
+        <div>
+          <div style="font-weight: 500;">Also remove students not in the file</div>
+          <div style="font-size: 12px; color: var(--ink-2); margin-top: 2px;">Pass history for removed students is preserved. Uncheck to leave them alone.</div>
+        </div>
+      </label>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button id="resync-cancel" style="flex: 1;">Cancel</button>
+      <button class="primary" id="resync-apply" style="flex: 1;">Apply changes</button>
     </div>
   </div>
 </div>
@@ -2000,9 +2060,10 @@ function openStudentDetail(studentId) {
     }
   }
   html += '<div style="margin-top: 16px; display: flex; gap: 8px; flex-wrap: wrap;">';
-  html += `<button id="detail-change-class" style="flex: 1;">Change class</button>`;
-  html += `<button id="detail-toggle-acc" style="flex: 1;">${student.accommodation ? 'Remove accommodation' : 'Mark as accommodated'}</button>`;
-  html += '<button class="primary" id="detail-close" style="flex: 1;">Close</button>';
+  html += `<button id="detail-change-class" style="flex: 1; min-width: 120px;">Change class</button>`;
+  html += `<button id="detail-toggle-acc" style="flex: 1; min-width: 120px;">${student.accommodation ? 'Remove accommodation' : 'Mark as accommodated'}</button>`;
+  html += `<button id="detail-remove-student" style="flex: 1; min-width: 120px; color: var(--over);">Remove student</button>`;
+  html += '<button class="primary" id="detail-close" style="flex: 1; min-width: 120px;">Close</button>';
   html += '</div>';
 
   document.getElementById('student-detail-modal').innerHTML = html;
@@ -2020,6 +2081,9 @@ function openStudentDetail(studentId) {
   });
   document.getElementById('detail-change-class').addEventListener('click', () => {
     openChangeClass(student);
+  });
+  document.getElementById('detail-remove-student').addEventListener('click', () => {
+    requestRemoveStudent(student);
   });
   // Wire up delete-pass buttons
   document.querySelectorAll('[data-delete-pass]').forEach(btn => {
@@ -2591,6 +2655,250 @@ function showImportPreview(result) {
   el.innerHTML = html;
   el.style.display = 'block';
 }
+
+// ============ REMOVE STUDENT ============
+let pendingRemoveStudent = null;
+
+function requestRemoveStudent(student) {
+  if (!student) return;
+  pendingRemoveStudent = student;
+  const period = getPeriod(student.periodId);
+  const passCount = state.passes.filter(p => p.studentId === student.id).length;
+  document.getElementById('remove-student-info').innerHTML = `
+    <div><strong>${escapeHtml(fullName(student))}</strong></div>
+    <div>ID ${escapeHtml(student.id)}${period ? ' · ' + escapeHtml(period.name) : ''}</div>
+    <div>${passCount} pass${passCount !== 1 ? 'es' : ''} on record</div>
+  `;
+  // Default to keep history
+  document.querySelectorAll('input[name="remove-mode"]').forEach(r => {
+    r.checked = r.value === 'keep';
+  });
+  document.getElementById('overlay-remove-student').classList.add('active');
+}
+
+document.getElementById('remove-student-cancel').addEventListener('click', () => {
+  document.getElementById('overlay-remove-student').classList.remove('active');
+  pendingRemoveStudent = null;
+});
+
+document.getElementById('remove-student-confirm').addEventListener('click', async () => {
+  if (!pendingRemoveStudent) return;
+  const mode = document.querySelector('input[name="remove-mode"]:checked').value;
+  document.getElementById('overlay-remove-student').classList.remove('active');
+  const ok = await requestPin('Required to remove student.');
+  if (!ok) { pendingRemoveStudent = null; return; }
+  const student = pendingRemoveStudent;
+  const name = fullName(student);
+  // Remove from roster
+  state.roster = state.roster.filter(s => s.id !== student.id);
+  // Remove quarter count for this student
+  delete state.quarterCounts[student.id];
+  // Optionally delete pass history
+  if (mode === 'wipe') {
+    state.passes = state.passes.filter(p => p.studentId !== student.id);
+    // Also clean up any barcode mappings pointing to this student
+    Object.keys(state.barcodeMap).forEach(raw => {
+      if (state.barcodeMap[raw] === student.id) delete state.barcodeMap[raw];
+    });
+  }
+  saveState();
+  pendingRemoveStudent = null;
+  toast(`Removed ${name}${mode === 'wipe' ? ' and all history' : ' (history kept)'}`);
+  // Close the student detail modal since the student no longer exists
+  document.getElementById('overlay-student-detail').classList.remove('active');
+  renderKiosk();
+  if (document.getElementById('panel-search').classList.contains('active')) renderSearch();
+  if (document.getElementById('panel-setup').classList.contains('active')) renderSetup();
+  if (document.getElementById('panel-dash').classList.contains('active')) renderDash();
+});
+
+// ============ RESYNC ROSTER ============
+let pendingResyncPlan = null;
+
+const fileDropResync = document.getElementById('file-drop-resync');
+const csvFileResync = document.getElementById('csv-file-resync');
+fileDropResync.addEventListener('click', () => csvFileResync.click());
+fileDropResync.addEventListener('dragover', (e) => { e.preventDefault(); fileDropResync.style.background = 'var(--surface-2)'; });
+fileDropResync.addEventListener('dragleave', () => { fileDropResync.style.background = ''; });
+fileDropResync.addEventListener('drop', (e) => {
+  e.preventDefault();
+  fileDropResync.style.background = '';
+  if (e.dataTransfer.files.length) handleResyncImport(e.dataTransfer.files[0]);
+});
+csvFileResync.addEventListener('change', (e) => {
+  if (e.target.files.length) handleResyncImport(e.target.files[0]);
+  e.target.value = '';
+});
+
+async function handleResyncImport(file) {
+  let rows;
+  try { rows = await readFileAsRows(file); }
+  catch (err) { toast('Could not read file: ' + err.message); return; }
+  if (rows.length < 2) { toast('File looks empty'); return; }
+
+  // Parse using the same logic as normal import
+  let byPeriod = null;
+  const aeries = tryParseAeriesRoster(rows);
+  if (aeries && aeries.byPeriod) {
+    byPeriod = aeries.byPeriod;
+  } else {
+    const col = tryParseColumnFormat(rows);
+    if (col && col.byPeriod) byPeriod = col.byPeriod;
+  }
+  if (!byPeriod) {
+    toast('Could not parse — need student IDs, names, and period info');
+    return;
+  }
+
+  // Build a flat map: studentId -> {firstName, lastName, id, periodName}
+  const fromFile = {};
+  Object.keys(byPeriod).forEach(periodName => {
+    byPeriod[periodName].forEach(s => {
+      fromFile[s.id] = { ...s, periodName };
+    });
+  });
+
+  // Compute diff against current state
+  const toAdd = [];        // new students in file
+  const toMove = [];       // existing students whose period changed
+  const toRemove = [];     // existing students not in file
+  const unchanged = [];    // existing, same period
+
+  Object.keys(fromFile).forEach(id => {
+    const fileStudent = fromFile[id];
+    const existing = state.roster.find(s => s.id === id);
+    if (!existing) {
+      toAdd.push(fileStudent);
+    } else {
+      const currentPeriod = getPeriod(existing.periodId);
+      const currentPeriodName = currentPeriod ? currentPeriod.name : '';
+      if (currentPeriodName.toLowerCase() !== fileStudent.periodName.toLowerCase()) {
+        toMove.push({ existing, from: currentPeriodName, to: fileStudent.periodName });
+      } else {
+        unchanged.push(existing);
+      }
+    }
+  });
+
+  state.roster.forEach(s => {
+    if (!fromFile[s.id]) toRemove.push(s);
+  });
+
+  // Store the plan
+  pendingResyncPlan = { toAdd, toMove, toRemove, fromFile };
+
+  // Render preview
+  const summary = document.getElementById('resync-summary');
+  summary.innerHTML = `
+    <div><strong>${toAdd.length}</strong> to add · <strong>${toMove.length}</strong> to move · <strong>${toRemove.length}</strong> not in file · ${unchanged.length} unchanged</div>
+  `;
+
+  const details = document.getElementById('resync-details');
+  let dh = '';
+  if (toAdd.length > 0) {
+    dh += `<div style="margin-bottom: 12px;"><div style="font-size: 12px; font-weight: 500; color: var(--ok); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">To add (${toAdd.length})</div>`;
+    toAdd.forEach(s => {
+      dh += `<div style="font-size: 13px; padding: 4px 0;">+ ${escapeHtml(s.firstName)} ${escapeHtml(s.lastName)} <span style="color: var(--ink-3);">→ ${escapeHtml(s.periodName)}</span></div>`;
+    });
+    dh += '</div>';
+  }
+  if (toMove.length > 0) {
+    dh += `<div style="margin-bottom: 12px;"><div style="font-size: 12px; font-weight: 500; color: #854f0b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Class changed (${toMove.length})</div>`;
+    toMove.forEach(m => {
+      dh += `<div style="font-size: 13px; padding: 4px 0;">↻ ${escapeHtml(fullName(m.existing))} <span style="color: var(--ink-3);">${escapeHtml(m.from || 'no class')} → ${escapeHtml(m.to)}</span></div>`;
+    });
+    dh += '</div>';
+  }
+  if (toRemove.length > 0) {
+    dh += `<div style="margin-bottom: 12px;"><div style="font-size: 12px; font-weight: 500; color: var(--over); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px;">Not in file (${toRemove.length})</div>`;
+    toRemove.forEach(s => {
+      const period = getPeriod(s.periodId);
+      dh += `<div style="font-size: 13px; padding: 4px 0;">− ${escapeHtml(fullName(s))} <span style="color: var(--ink-3);">${period ? escapeHtml(period.name) : ''}</span></div>`;
+    });
+    dh += '</div>';
+  }
+  if (toAdd.length === 0 && toMove.length === 0 && toRemove.length === 0) {
+    dh = '<div style="text-align: center; padding: 20px; color: var(--ink-3);">No changes — roster already matches the file.</div>';
+  }
+  details.innerHTML = dh;
+
+  // Show remove toggle only if there are potential removals
+  const removeToggle = document.getElementById('resync-remove-toggle');
+  removeToggle.style.display = toRemove.length > 0 ? 'block' : 'none';
+  document.getElementById('resync-remove-checkbox').checked = false;
+
+  // Disable Apply if nothing to do
+  const applyBtn = document.getElementById('resync-apply');
+  applyBtn.disabled = (toAdd.length === 0 && toMove.length === 0);
+  applyBtn.style.opacity = applyBtn.disabled && toRemove.length === 0 ? '0.5' : '1';
+
+  document.getElementById('overlay-resync').classList.add('active');
+}
+
+document.getElementById('resync-cancel').addEventListener('click', () => {
+  document.getElementById('overlay-resync').classList.remove('active');
+  pendingResyncPlan = null;
+});
+
+document.getElementById('resync-apply').addEventListener('click', async () => {
+  if (!pendingResyncPlan) return;
+  const doRemove = document.getElementById('resync-remove-checkbox').checked;
+  const { toAdd, toMove, toRemove } = pendingResyncPlan;
+  if (toAdd.length === 0 && toMove.length === 0 && !(doRemove && toRemove.length > 0)) {
+    toast('Nothing to apply');
+    return;
+  }
+  document.getElementById('overlay-resync').classList.remove('active');
+  const ok = await requestPin('Required to modify roster.');
+  if (!ok) { pendingResyncPlan = null; return; }
+
+  // Ensure periods exist for anything being added or moved to
+  const ensurePeriod = (name) => {
+    let period = state.periods.find(p => p.name.toLowerCase() === name.toLowerCase());
+    if (!period) {
+      period = { id: uid(), name };
+      state.periods.push(period);
+    }
+    return period;
+  };
+
+  // Additions
+  toAdd.forEach(s => {
+    const period = ensurePeriod(s.periodName);
+    state.roster.push({
+      id: s.id,
+      firstName: s.firstName,
+      lastName: s.lastName,
+      periodId: period.id,
+      accommodation: false
+    });
+  });
+
+  // Moves — update periodId on existing student; pass history stays intact
+  toMove.forEach(m => {
+    const period = ensurePeriod(m.to);
+    const student = state.roster.find(s => s.id === m.existing.id);
+    if (student) student.periodId = period.id;
+  });
+
+  // Removals (only if checked) — keep pass history
+  let removedCount = 0;
+  if (doRemove) {
+    const idsToRemove = new Set(toRemove.map(s => s.id));
+    state.roster = state.roster.filter(s => !idsToRemove.has(s.id));
+    idsToRemove.forEach(id => { delete state.quarterCounts[id]; });
+    removedCount = idsToRemove.size;
+  }
+
+  saveState();
+  const parts = [];
+  if (toAdd.length) parts.push(`${toAdd.length} added`);
+  if (toMove.length) parts.push(`${toMove.length} moved`);
+  if (removedCount) parts.push(`${removedCount} removed`);
+  toast(`Roster synced: ${parts.join(', ')}`);
+  pendingResyncPlan = null;
+  renderSetup();
+});
 
 // ============ TOAST ============
 function toast(msg) {
